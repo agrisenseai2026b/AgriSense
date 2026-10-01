@@ -1,0 +1,787 @@
+/* =========================================================
+   AGRISENSE AI - GLOBAL STYLES
+   Used by:
+   - Crop Recommendation
+   - Fertilizer Prediction
+   - Smart Irrigation
+   - Plant Disease Detection
+========================================================= */
+
+/* =========================================================
+   RESET
+========================================================= */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family:
+        Inter,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        Arial,
+        sans-serif;
+
+    background: #f6faf7;
+    color: #1d2b21;
+    min-height: 100vh;
+}
+
+a {
+    text-decoration: none;
+}
+
+button,
+input,
+select {
+    font-family: inherit;
+}
+
+
+/* =========================================================
+   NAVBAR
+========================================================= */
+
+.navbar {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.96);
+    border-bottom: 1px solid #e1e9e3;
+    box-shadow: 0 3px 18px rgba(30, 70, 40, 0.05);
+
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+
+    backdrop-filter: blur(12px);
+}
+
+.nav-container {
+    width: 100%;
+    max-width: 1200px;
+
+    margin: 0 auto;
+    padding: 15px 28px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+
+/* =========================================================
+   BRAND
+========================================================= */
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+}
+
+.brand-icon {
+    width: 44px;
+    height: 44px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: #e8f5e9;
+    border-radius: 13px;
+
+    font-size: 23px;
+}
+
+.brand-name {
+    color: #183d26;
+    font-size: 21px;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+.brand-tagline {
+    margin-top: 3px;
+
+    color: #718077;
+    font-size: 10px;
+    font-weight: 700;
+
+    letter-spacing: 1.1px;
+}
+
+
+/* =========================================================
+   HOME BUTTON
+========================================================= */
+
+.nav-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 7px;
+
+    padding: 10px 18px;
+
+    background: #236b35;
+    color: #ffffff !important;
+
+    border-radius: 10px;
+
+    font-size: 14px;
+    font-weight: 700;
+
+    border: 1px solid #236b35;
+
+    transition:
+        background 0.2s ease,
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.nav-button:hover {
+    background: #1d5c2d;
+    border-color: #1d5c2d;
+
+    transform: translateY(-1px);
+
+    box-shadow:
+        0 6px 16px rgba(35, 107, 53, 0.20);
+}
+
+
+/* =========================================================
+   MAIN PREDICTION PAGE
+========================================================= */
+
+.prediction-page {
+    min-height: calc(100vh - 75px);
+
+    padding:
+        65px 20px 90px;
+
+    background:
+        linear-gradient(
+            180deg,
+            #f7fbf8 0%,
+            #ffffff 100%
+        );
+}
+
+.prediction-container {
+    width: 100%;
+    max-width: 900px;
+
+    margin: 0 auto;
+}
+
+
+/* =========================================================
+   PAGE HEADER
+========================================================= */
+
+.prediction-header {
+    text-align: center;
+    margin-bottom: 38px;
+}
+
+.prediction-header .icon {
+    width: 68px;
+    height: 68px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    margin-bottom: 17px;
+
+    background: #eaf6ec;
+    border: 1px solid #d7ead9;
+
+    border-radius: 20px;
+
+    font-size: 34px;
+
+    box-shadow:
+        0 8px 22px rgba(35, 107, 53, 0.07);
+}
+
+.prediction-header h1 {
+    color: #172a1d;
+
+    font-size: clamp(30px, 5vw, 42px);
+    font-weight: 800;
+
+    letter-spacing: -1px;
+
+    margin-bottom: 12px;
+}
+
+.prediction-header p {
+    max-width: 650px;
+
+    margin: 0 auto;
+
+    color: #6c786f;
+
+    font-size: 15px;
+    line-height: 1.7;
+}
+
+
+/* =========================================================
+   PREDICTION FORM CARD
+========================================================= */
+
+.prediction-form {
+    width: 100%;
+
+    padding: 34px;
+
+    background: #ffffff;
+
+    border:
+        1px solid #dfe9e1;
+
+    border-radius: 22px;
+
+    box-shadow:
+        0 15px 45px rgba(25, 65, 35, 0.07);
+}
+
+
+/* =========================================================
+   FORM GRID
+========================================================= */
+
+.form-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 22px;
+}
+
+
+/* =========================================================
+   FORM GROUP
+========================================================= */
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+
+/* =========================================================
+   LABEL
+========================================================= */
+
+.form-group label {
+    margin-bottom: 8px;
+
+    color: #304236;
+
+    font-size: 13px;
+    font-weight: 700;
+}
+
+
+/* =========================================================
+   INPUT + SELECT
+========================================================= */
+
+.form-group input,
+.form-group select {
+    width: 100%;
+
+    height: 48px;
+
+    padding:
+        0 14px;
+
+    border:
+        1px solid #d5e0d7;
+
+    border-radius: 10px;
+
+    background: #fbfdfb;
+
+    color: #26372b;
+
+    font-size: 14px;
+
+    outline: none;
+
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        background 0.2s ease;
+}
+
+.form-group input::placeholder {
+    color: #a1aba4;
+}
+
+.form-group input:hover,
+.form-group select:hover {
+    border-color: #a8c5ad;
+    background: #ffffff;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    border-color: #398048;
+
+    background: #ffffff;
+
+    box-shadow:
+        0 0 0 4px rgba(57, 128, 72, 0.09);
+}
+
+
+/* =========================================================
+   SELECT
+========================================================= */
+
+.form-group select {
+    cursor: pointer;
+}
+
+
+/* =========================================================
+   PREDICT BUTTON
+========================================================= */
+
+.predict-button {
+    width: 100%;
+
+    min-height: 50px;
+
+    margin-top: 28px;
+
+    border: none;
+    border-radius: 11px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #287a3e,
+            #236b35
+        );
+
+    color: #ffffff;
+
+    font-size: 14px;
+    font-weight: 800;
+
+    cursor: pointer;
+
+    box-shadow:
+        0 8px 20px rgba(38, 116, 58, 0.18);
+
+    transition:
+        transform 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease,
+        opacity 0.2s ease;
+}
+
+.predict-button:hover {
+    background:
+        linear-gradient(
+            135deg,
+            #236d37,
+            #1d5c2d
+        );
+
+    transform: translateY(-2px);
+
+    box-shadow:
+        0 12px 25px rgba(38, 116, 58, 0.24);
+}
+
+.predict-button:active {
+    transform: translateY(0);
+}
+
+.predict-button:disabled {
+    cursor: wait;
+
+    transform: none;
+
+    opacity: 0.75;
+
+    box-shadow: none;
+}
+
+
+/* =========================================================
+   RESULT CARD
+========================================================= */
+
+.result {
+    margin-top: 28px;
+
+    padding: 25px 28px;
+
+    border-radius: 18px;
+
+    background: #ffffff;
+
+    border: 1px solid #dfe9e1;
+
+    box-shadow:
+        0 12px 35px rgba(25, 65, 35, 0.06);
+}
+
+
+/* =========================================================
+   SUCCESS RESULT
+========================================================= */
+
+.result.success {
+    display: flex;
+    align-items: center;
+
+    gap: 20px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #f0f9f1,
+            #ffffff
+        );
+
+    border-color: #cfe3d2;
+}
+
+.result-icon {
+    width: 62px;
+    height: 62px;
+
+    flex-shrink: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: #e3f3e6;
+
+    border-radius: 17px;
+
+    font-size: 30px;
+}
+
+.result.success span {
+    display: block;
+
+    margin-bottom: 5px;
+
+    color: #6c7b70;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.7px;
+}
+
+.result.success h2 {
+    color: #246b35;
+
+    font-size: 25px;
+    font-weight: 800;
+}
+
+
+/* =========================================================
+   ERROR RESULT
+========================================================= */
+
+.result.error {
+    background: #fff7f6;
+
+    border-color: #efceca;
+}
+
+.result.error strong {
+    display: block;
+
+    margin-bottom: 7px;
+
+    color: #a33d35;
+
+    font-size: 15px;
+}
+
+.result.error p {
+    color: #80524e;
+
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+
+/* =========================================================
+   DISEASE PAGE SUPPORT
+========================================================= */
+
+.prediction-form.scanner-form {
+    display: grid;
+
+    grid-template-columns:
+        1fr 190px;
+
+    gap: 25px;
+
+    align-items: center;
+}
+
+
+/* =========================================================
+   DISEASE UPLOAD AREA
+========================================================= */
+
+.drop-zone {
+    min-height: 240px;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    padding: 25px;
+
+    border:
+        2px dashed #bcd3c1;
+
+    border-radius: 18px;
+
+    background: #f9fcf9;
+
+    cursor: pointer;
+
+    text-align: center;
+
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        transform 0.2s ease;
+}
+
+.drop-zone:hover {
+    border-color: #579d64;
+
+    background: #f1f9f2;
+
+    transform: translateY(-1px);
+}
+
+.drop-zone input {
+    display: none;
+}
+
+.upload-cloud {
+    font-size: 45px;
+
+    margin-bottom: 10px;
+}
+
+.drop-zone h3 {
+    color: #293b2e;
+
+    font-size: 17px;
+
+    margin-bottom: 6px;
+}
+
+.drop-zone p {
+    color: #748078;
+
+    font-size: 13px;
+
+    margin-bottom: 8px;
+}
+
+.drop-zone span {
+    color: #9aa59d;
+
+    font-size: 11px;
+}
+
+
+/* =========================================================
+   IMAGE PREVIEW
+========================================================= */
+
+.preview-container {
+    display: none;
+
+    width: 100%;
+    max-height: 210px;
+
+    overflow: hidden;
+
+    border-radius: 14px;
+}
+
+#imagePreview {
+    display: none;
+
+    width: 100%;
+    max-height: 210px;
+
+    object-fit: contain;
+
+    border-radius: 14px;
+}
+
+
+/* =========================================================
+   DISEASE SCANNER BUTTON
+========================================================= */
+
+.scanner-button {
+    width: 100%;
+
+    min-height: 50px;
+
+    border: none;
+    border-radius: 11px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #287a3e,
+            #236b35
+        );
+
+    color: #ffffff;
+
+    font-size: 14px;
+    font-weight: 800;
+
+    cursor: pointer;
+
+    transition:
+        transform 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.scanner-button:hover {
+    transform: translateY(-2px);
+
+    background:
+        linear-gradient(
+            135deg,
+            #236d37,
+            #1d5c2d
+        );
+
+    box-shadow:
+        0 10px 22px rgba(38, 116, 58, 0.20);
+}
+
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width: 800px) {
+
+    .nav-container {
+        padding: 13px 18px;
+    }
+
+    .prediction-page {
+        padding:
+            45px 16px 70px;
+    }
+
+    .prediction-form {
+        padding: 25px 20px;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+
+    .form-group.full-width {
+        grid-column: auto;
+    }
+
+    .prediction-form.scanner-form {
+        grid-template-columns: 1fr;
+    }
+
+    .scanner-button {
+        width: 100%;
+    }
+}
+
+
+@media (max-width: 550px) {
+
+    .brand-name {
+        font-size: 18px;
+    }
+
+    .brand-tagline {
+        font-size: 8px;
+    }
+
+    .brand-icon {
+        width: 39px;
+        height: 39px;
+        font-size: 20px;
+    }
+
+    .nav-button {
+        padding: 9px 13px;
+        font-size: 13px;
+    }
+
+    .prediction-header {
+        margin-bottom: 28px;
+    }
+
+    .prediction-header h1 {
+        font-size: 30px;
+    }
+
+    .prediction-header p {
+        font-size: 14px;
+    }
+
+    .prediction-form {
+        padding: 20px 16px;
+        border-radius: 17px;
+    }
+
+    .result.success {
+        align-items: flex-start;
+    }
+
+    .result.success h2 {
+        font-size: 21px;
+    }
+}

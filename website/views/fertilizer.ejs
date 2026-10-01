@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Fertilizer Prediction | AgriSense</title>
+
+    <link rel="stylesheet"
+          href="/css/style.css">
+
+</head>
+
+<body>
+
+<header class="navbar">
+
+    <div class="nav-container">
+
+        <div class="brand">
+
+            <div class="brand-icon">
+                🌱
+            </div>
+
+            <div>
+                <div class="brand-name">
+                    AgriSense
+                </div>
+
+                <div class="brand-tagline">
+                    SMART AGRICULTURE
+                </div>
+            </div>
+
+        </div>
+
+        <a href="/" class="nav-button">
+            🏠 Home
+        </a>
+
+    </div>
+
+</header>
+
+<main class="prediction-page">
+
+    <div class="prediction-container">
+
+        <div class="prediction-header">
+
+            <span class="icon">🧪</span>
+
+            <h1>Fertilizer Prediction</h1>
+
+            <p>
+                Enter your crop, soil and nutrient information
+                to find the most suitable fertilizer.
+            </p>
+
+        </div>
+
+
+        <form action="/fertilizer-predict"
+              method="POST"
+              class="prediction-form">
+
+
+            <div class="form-grid">
+
+
+                <!-- Temperature -->
+
+                <div class="form-group">
+
+                    <label>
+                        Temperature (°C)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="temperature"
+                        step="any"
+                        value="<%= temperature %>"
+                        required
+                    >
+
+                </div>
+
+
+                <!-- Humidity -->
+
+                <div class="form-group">
+
+                    <label>
+                        Humidity (%)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="humidity"
+                        step="any"
+                        value="<%= humidity %>"
+                        required
+                    >
+
+                </div>
+
+
+                <!-- Moisture -->
+
+                <div class="form-group">
+
+                    <label>
+                        Moisture
+                    </label>
+
+                    <input
+                        type="number"
+                        name="moisture"
+                        step="any"
+                        value="<%= moisture %>"
+                        required
+                    >
+
+                </div>
+
+
+                <!-- Soil Type -->
+
+                <div class="form-group">
+
+    <label>
+        Soil Type
+    </label>
+
+    <select
+    name="soilType"
+    required
+>
+
+    <option value="">Select soil type</option>
+
+    <option
+        value="Clay"
+        <%= soilType == "Clay" ? "selected" : "" %>
+    >
+        Clay
+    </option>
+
+    <option
+        value="Silt"
+        <%= soilType == "Silt" ? "selected" : "" %>
+    >
+        Silt
+    </option>
+
+    <option
+        value="Sandy"
+        <%= soilType == "Sandy" ? "selected" : "" %>
+    >
+        Sandy
+    </option>
+
+    <option
+        value="Loamy"
+        <%= soilType == "Loamy" ? "selected" : "" %>
+    >
+        Loamy
+    </option>
+
+</select>
+
+</div>
+
+                <!-- Crop Type -->
+
+                <div class="form-group">
+
+    <label>
+        Crop Type
+    </label>
+
+    <select
+    name="cropType"
+    required
+>
+
+    <option value="">Select crop</option>
+
+    <option
+        value="Wheat"
+        <%= cropType == "Wheat" ? "selected" : "" %>
+    >
+        Wheat
+    </option>
+
+    <option
+        value="Rice"
+        <%= cropType == "Rice" ? "selected" : "" %>
+    >
+        Rice
+    </option>
+
+    <option
+        value="Maize"
+        <%= cropType == "Maize" ? "selected" : "" %>
+    >
+        Maize
+    </option>
+
+    <option
+        value="Cotton"
+        <%= cropType == "Cotton" ? "selected" : "" %>
+        >
+        Cotton
+    </option>
+
+    <option
+        value="Soybean"
+        <%= cropType == "Soybean" ? "selected" : "" %>
+    >
+        Soybean
+    </option>
+
+    <option
+        value="Sugarcane"
+        <%= cropType === "Sugarcane" ? "selected" : "" %>
+    >
+        Sugarcane
+    </option>
+
+    <option
+        value="Cotton"
+        <%= cropType === "Cotton" ? "selected" : "" %>
+    >
+        Cotton
+    </option>
+
+    <option
+        value="Tobacco"
+        <%= cropType === "Tobacco" ? "selected" : "" %>
+    >
+        Tobacco
+    </option>
+
+    <option
+        value="Paddy"
+        <%= cropType === "Paddy" ? "selected" : "" %>
+    >
+        Paddy
+    </option>
+
+    <option
+        value="Barley"
+        <%= cropType === "Barley" ? "selected" : "" %>
+    >
+        Barley
+    </option>
+
+    <option
+        value="Millets"
+        <%= cropType === "Millets" ? "selected" : "" %>
+    >
+        Millets
+    </option>
+
+    <option
+        value="Oil seeds"
+        <%= cropType === "Oil seeds" ? "selected" : "" %>
+    >
+        Oil seeds
+    </option>
+
+    <option
+        value="Pulses"
+        <%= cropType === "Pulses" ? "selected" : "" %>
+    >
+        Pulses
+    </option>
+
+    <option
+        value="Ground Nuts"
+        <%= cropType === "Ground Nuts" ? "selected" : "" %>
+    >
+        Ground Nuts
+    </option>
+</select>
+
+</div>
+
+
+                <!-- Nitrogen -->
+
+                <div class="form-group">
+
+                    <label>
+                        Nitrogen
+                    </label>
+
+                        <input
+                        type="number"
+                        name="nitrogen"
+                        step="any"
+                        value="<%= nitrogen %>"
+                        required
+                    >
+
+                </div>
+
+
+                <!-- Potassium -->
+
+                <div class="form-group">
+
+                    <label>
+                        Potassium
+                    </label>
+
+                    <input
+                        type="number"
+                        name="potassium"
+                        step="any"
+                        value="<%= potassium %>"
+                        required
+                    >
+
+                </div>
+
+
+                <!-- Phosphorous -->
+
+                <div class="form-group">
+
+                    <label>
+                        Phosphorous
+                    </label>
+
+                    <input
+                        type="number"
+                        name="phosphorus"
+                        step="any"
+                        value="<%= phosphorus %>"
+                        required
+                    >
+
+                </div>
+
+
+            </div>
+
+
+            <button
+                type="submit"
+                class="predict-button"
+            >
+
+                🧪 Predict Fertilizer
+
+            </button>
+
+        </form>
+
+
+        <% if (prediction) { %>
+
+            <div class="result success">
+
+                <div class="result-icon">
+                    🧪
+                </div>
+
+                <div>
+
+                    <span>
+                        Recommended Fertilizer
+                    </span>
+
+                    <h2>
+                        <%= prediction %>
+                    </h2>
+
+                </div>
+
+            </div>
+
+        <% } %>
+
+
+        <% if (error) { %>
+
+            <div class="result error">
+
+                <strong>
+                    Prediction Error
+                </strong>
+
+                <p>
+                    <%= error %>
+                </p>
+
+            </div>
+
+        <% } %>
+
+
+    </div>
+
+</main>
+
+</body>
+
+</html>

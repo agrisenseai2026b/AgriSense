@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Water Irrigation Prediction | AgriSense</title>
+
+    <link rel="stylesheet"
+          href="/css/style.css">
+          <style>
+
+    /* =========================================
+       IRRIGATION PREDICTION BUTTON
+       ========================================= */
+
+    .irrigation-predict-button {
+        grid-column: 1 / -1 !important;
+
+        width: 100% !important;
+        display: block;
+        box-sizing: border-box;
+
+        background: #247a3b;
+        color: white;
+
+        border: none;
+        border-radius: 10px;
+
+        padding: 15px 20px;
+
+        font-size: 14px;
+        font-weight: 700;
+
+        cursor: pointer;
+
+        margin-top: 25px;
+
+        box-shadow: 0 8px 18px rgba(36, 122, 59, 0.15);
+
+        transition:
+            background 0.2s ease,
+            transform 0.2s ease,
+            box-shadow 0.2s ease;
+    }
+
+    .irrigation-predict-button:hover {
+        background: #1f6d35;
+
+        transform: translateY(-1px);
+
+        box-shadow:
+            0 10px 22px rgba(36, 122, 59, 0.20);
+    }
+
+    .irrigation-predict-button:active {
+        transform: translateY(0);
+    }
+
+</style>
+
+</head>
+
+<body>
+
+<header class="navbar">
+
+    <div class="nav-container">
+
+        <div class="brand">
+
+            <div class="brand-icon">
+                🌱
+            </div>
+
+            <div>
+                <div class="brand-name">
+                    AgriSense
+                </div>
+
+                <div class="brand-tagline">
+                    SMART AGRICULTURE
+                </div>
+            </div>
+
+        </div>
+
+        <a href="/" class="nav-button">
+            🏠 Home
+        </a>
+
+    </div>
+
+</header>
+
+
+<main class="prediction-page">
+
+    <div class="prediction-container">
+
+
+        <!-- ==============================
+             HEADER
+        =============================== -->
+
+        <div class="prediction-header">
+
+            <span class="icon">💧</span>
+
+            <h1>
+                Water Irrigation Prediction
+            </h1>
+
+            <p>
+                Enter your soil, weather, crop and
+                farm information to determine the
+                irrigation requirement of your field.
+            </p>
+
+        </div>
+
+
+
+        <!-- ==============================
+             FORM
+        =============================== -->
+
+        <form action="/irrigation-predict"
+              method="POST"
+              class="prediction-form">
+
+
+            <div class="form-grid">
+
+
+                <!-- ==============================
+                     SOIL TYPE
+                =============================== -->
+
+                <!-- Soil Type -->
+
+                <div class="form-group">
+
+                        <label>
+                            Soil Type
+                        </label>
+
+                        <select
+                            name="soilType"
+                            required
+                        >
+
+                            <option
+                                value="Loamy"
+                                <%= soilType === "Loamy" ? "selected" : "" %>
+                            >
+                                Loamy
+                            </option>
+
+                            <option
+                                value="Clay"
+                                <%= soilType === "Clay" ? "selected" : "" %>
+                            >
+                                Clay
+                            </option>
+
+                            <option
+                                value="Sandy"
+                                <%= soilType === "Sandy" ? "selected" : "" %>
+                            >
+                                Sandy
+                            </option>
+
+                            <option
+                                value="Black"
+                                <%= soilType === "Black" ? "selected" : "" %>
+                            >
+                                Black
+                            </option>
+
+                            <option
+                                value="Red"
+                                <%= soilType === "Red" ? "selected" : "" %>
+                            >
+                                Red
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+
+                <!-- ==============================
+                     SOIL pH
+                =============================== -->
+
+                <div class="form-group">
+
+                    <label>
+                        Soil pH
+                    </label>
+
+                    <input
+                        type="number"
+                        name="soil_ph"
+                        step="any"
+                        min="0"
+                        max="14"
+                        value="<%= pH %>"
+                        placeholder="Example: 6.5"
+                        required
+                    >
+
+                </div>
+
+
+
+                <!-- ==============================
+                     SOIL MOISTURE
+                =============================== -->
+
+                <div class="form-group">
+
+                    <label>
+                        Soil Moisture
+                    </label>
+
+                    <input
+                        type="number"
+                        name="soil_moisture"
+                        step="any"
+                        value="<%= moisture %>"
+                        placeholder="Example: 25"
+                        required
+                    >
+
+                </div>
+
+
+
+                <!-- ==============================
+                     TEMPERATURE
+                =============================== -->
+
+                <div class="form-group">
+
+                    <label>
+                        Temperature (°C)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="temperature_c"
+                        step="any"
+                        value="<%= temperature %>"
+                        placeholder="Example: 32"
+                        required
+                    >
+
+                </div>
+
+
+
+                <!-- ==============================
+                     HUMIDITY
+                =============================== -->
+
+                <div class="form-group">
+
+                    <label>
+                        Humidity (%)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="humidity"
+                        step="any"
+                        value="<%= humidity %>"
+                        placeholder="Example: 55"
+                        required
+                    >
+
+                </div>
+
+
+
+                <!-- ==============================
+                     RAINFALL
+                =============================== -->
+
+                <div class="form-group">
+
+                    <label>
+                        Rainfall (mm)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="rainfall_mm"
+                        step="any"
+                        min="0"
+                        value="<%= rainfall %>"
+                        placeholder="Example: 5"
+                        required
+                    >
+
+                </div>
+
+
+
+                <!-- ==============================
+                     WIND SPEED
+                =============================== -->
+
+                <div class="form-group">
+
+                    <label>
+                        Wind Speed (km/h)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="wind_speed_kmh"
+                        step="any"
+                        min="0"
+                        value="<%= windSpeed %>"
+                        placeholder="Example: 12"
+                        required
+                    >
+
+                </div>
+
+
+
+                <!-- ==============================
+                     CROP TYPE
+                =============================== -->
+
+                <div class="form-group">
+
+    <label>
+        Crop Type
+    </label>
+
+    <select
+        name="cropType"
+        required
+    >
+
+        <option
+            value="Wheat"
+            <%= cropType === "Wheat" ? "selected" : "" %>
+        >
+            Wheat
+        </option>
+
+        <option
+            value="Rice"
+            <%= cropType === "Rice" ? "selected" : "" %>
+        >
+            Rice
+        </option>
+
+        <option
+            value="Maize"
+            <%= cropType === "Maize" ? "selected" : "" %>
+        >
+            Maize
+        </option>
+
+        <option
+            value="Cotton"
+            <%= cropType === "Cotton" ? "selected" : "" %>
+        >
+            Cotton
+        </option>
+
+        <option
+            value="Soybean"
+            <%= cropType === "Soybean" ? "selected" : "" %>
+        >
+            Soybean
+        </option>
+
+        <option
+            value="Sugarcane"
+            <%= cropType === "Sugarcane" ? "selected" : "" %>
+        >
+            Sugarcane
+        </option>
+
+        <option
+            value="Pulses"
+            <%= cropType === "Pulses" ? "selected" : "" %>
+        >
+            Pulses
+        </option>
+
+        <option
+            value="Tobacco"
+            <%= cropType === "Tobacco" ? "selected" : "" %>
+        >
+            Tobacco
+        </option>
+
+        <option
+            value="Barley"
+            <%= cropType === "Barley" ? "selected" : "" %>
+        >
+            Barley
+        </option>
+
+        <option
+            value="Millets"
+            <%= cropType === "Millets" ? "selected" : "" %>
+        >
+            Millets
+        </option>
+
+        <option
+            value="Oil seeds"
+            <%= cropType === "Oil seeds" ? "selected" : "" %>
+        >
+            Oil seeds
+        </option>
+
+        <option
+            value="Ground Nuts"
+            <%= cropType === "Ground Nuts" ? "selected" : "" %>
+        >
+            Ground Nuts
+        </option>
+
+    </select>
+
+</div>
+
+
+
+                <!-- ==============================
+                     SEASON
+                =============================== -->
+
+                <div class="form-group">
+
+    <label>
+        Season
+    </label>
+
+    <select
+        name="season"
+        required
+    >
+
+        <option
+            value="Summer"
+            <%= season === "Summer" ? "selected" : "" %>
+        >
+            Summer
+        </option>
+
+        <option
+            value="Winter"
+            <%= season === "Winter" ? "selected" : "" %>
+        >
+            Winter
+        </option>
+
+        <option
+            value="Monsoon"
+            <%= season === "Monsoon" ? "selected" : "" %>
+        >
+            Monsoon
+        </option>
+
+        <option
+            value="Spring"
+            <%= season === "Spring" ? "selected" : "" %>
+        >
+            Spring
+        </option>
+
+        <option
+            value="Autumn"
+            <%= season === "Autumn" ? "selected" : "" %>
+        >
+            Autumn
+        </option>
+
+    </select>
+
+</div>
+
+
+
+
+                <!-- ==============================
+                     IRRIGATION TYPE
+                =============================== -->
+
+                <div class="form-group">
+
+    <label>
+        Irrigation Type
+    </label>
+
+    <select
+        name="irrigationType"
+        required
+    >
+
+        <option
+            value="Drip"
+            <%= irrigationType === "Drip" ? "selected" : "" %>
+        >
+            Drip
+        </option>
+
+        <option
+            value="Canal"
+            <%= irrigationType === "Canal" ? "selected" : "" %>
+        >
+            Canal
+        </option>
+
+        <option
+            value="Sprinkler"
+            <%= irrigationType === "Sprinkler" ? "selected" : "" %>
+        >
+            Sprinkler
+        </option>
+
+        <option
+            value="Rainfed"
+            <%= irrigationType === "Rainfed" ? "selected" : "" %>
+        >
+            Rainfed
+        </option>
+
+        <option
+            value="Flood"
+            <%= irrigationType === "Flood" ? "selected" : "" %>
+        >
+            Flood
+        </option>
+
+    </select>
+
+</div>
+
+
+
+                <!-- ==============================
+                     WATER SOURCE
+                =============================== -->
+
+                <div class="form-group">
+
+                    <label>
+                        Water Source
+                    </label>
+
+                    <select
+                        name="waterSource"
+                        required
+                    >
+
+                        <option
+                            value="Reservoir"
+                            <%= waterSource === "Reservoir" ? "selected" : "" %>
+                        >
+                            Reservoir
+                        </option>
+
+                        <option
+                            value="Groundwater"
+                            <%= waterSource === "Groundwater" ? "selected" : "" %>
+                        >
+                            Groundwater
+                        </option>
+
+                        <option
+                            value="River"
+                            <%= waterSource === "River" ? "selected" : "" %>
+                        >
+                            River
+                        </option>
+
+                        <option
+                            value="Canal"
+                            <%= waterSource === "Canal" ? "selected" : "" %>
+                        >
+                            Canal
+                        </option>
+
+                        <option
+                            value="Well"
+                            <%= waterSource === "Well" ? "selected" : "" %>
+                        >
+                            Well
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+
+                <!-- ==============================
+                     FIELD AREA
+                =============================== -->
+
+                <div class="form-group">
+
+                    <label>
+                        Field Area (hectare)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="field_area_hectare"
+                        step="any"
+                        min="0"
+                        value="<%= fieldArea %>"
+                        placeholder="Example: 2.5"
+                        required
+                    >
+
+                </div>
+
+
+
+                <!-- ==============================
+                     REGION
+                =============================== -->
+
+                <div class="form-group full-width">
+
+                <label>
+                    Region
+                </label>
+
+                <select
+                    name="region"
+                    required
+                >
+
+                    <option
+                        value="North"
+                        <%= region === "North" ? "selected" : "" %>
+                    >
+                        North
+                    </option>
+
+                    <option
+                        value="South"
+                        <%= region === "South" ? "selected" : "" %>
+                    >
+                        South
+                    </option>
+
+                    <option
+                        value="East"
+                        <%= region === "East" ? "selected" : "" %>
+                    >
+                        East
+                    </option>
+
+                    <option
+                        value="West"
+                        <%= region === "West" ? "selected" : "" %>
+                    >
+                        West
+                    </option>
+
+                    <option
+                        value="Central"
+                        <%= region === "Central" ? "selected" : "" %>
+                    >
+                        Central
+                    </option>
+
+                </select>
+
+            </div>
+
+
+
+            <!-- ==============================
+                 PREDICT BUTTON
+            =============================== -->
+
+            <button
+                type="submit"
+                class="irrigation-predict-button"
+            >
+
+                💧 Predict Irrigation Need
+
+            </button>
+
+
+        </form>
+    </div>
+
+
+
+        <!-- ==============================
+             RESULT
+        =============================== -->
+
+        <% if (prediction) { %>
+
+            <div class="result success">
+
+                <div class="result-icon">
+                    💧
+                </div>
+
+                <div>
+
+                    <span>
+                        Irrigation Requirement
+                    </span>
+
+                    <h2>
+                        <%= prediction %>
+                    </h2>
+
+                    <% if (confidence) { %>
+
+                        <p>
+                            Confidence:
+                            <strong>
+                                <%= confidence %>%
+                            </strong>
+                        </p>
+
+                    <% } %>
+
+                    <% if (recommendation) { %>
+
+                        <p>
+                            <strong>
+                                Recommendation:
+                            </strong>
+
+                            <%= recommendation %>
+                        </p>
+
+                    <% } %>
+
+                </div>
+
+            </div>
+
+        <% } %>
+
+
+
+        <!-- ==============================
+             ERROR
+        =============================== -->
+
+        <% if (error) { %>
+
+            <div class="result error">
+
+                <strong>
+                    Prediction Error
+                </strong>
+
+                <p>
+                    <%= error %>
+                </p>
+
+            </div>
+
+        <% } %>
+
+
+    </div>
+
+</main>
+
+</body>
+
+</html>

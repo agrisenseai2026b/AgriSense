@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Crop Recommendation | AgriSense</title>
+
+    <link rel="stylesheet"
+          href="/css/style.css">
+
+</head>
+
+<body>
+
+<header class="navbar">
+
+    <div class="nav-container">
+
+        <div class="brand">
+
+            <div class="brand-icon">
+                🌱
+            </div>
+
+            <div>
+                <div class="brand-name">
+                    AgriSense
+                </div>
+
+                <div class="brand-tagline">
+                    SMART AGRICULTURE
+                </div>
+            </div>
+
+        </div>
+
+        <a href="/" class="nav-button">
+            🏠 Home
+        </a>
+
+    </div>
+
+</header>
+
+
+<main class="prediction-page">
+
+    <div class="prediction-container">
+
+        <div class="prediction-header">
+
+            <span class="icon">🌾</span>
+
+            <h1>Crop Recommendation</h1>
+
+            <p>
+                Enter your soil and environmental conditions
+                to find the most suitable crop.
+            </p>
+
+        </div>
+
+
+        <form action="/crop-predict"
+              method="POST"
+              class="prediction-form">
+
+
+            <div class="form-grid">
+
+                <div class="form-group">
+
+                    <label>
+                        Nitrogen (N)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="N"
+                        step="any"
+                        value="<%= nitrogen %>"
+                        placeholder="Example: 90"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        Phosphorus (P)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="P"
+                        step="any"
+                        value= "<%= phosphorus %>"
+                        placeholder="Example: 42"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        Potassium (K)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="K"
+                        step="any"
+                        value="<%= potassium %>"
+                        placeholder="Example: 43"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        Temperature (°C)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="temperature"
+                        step="any"
+                        value="<%= temperature %>"
+                        placeholder="Example: 25"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        Humidity (%)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="humidity"
+                        step="any"
+                        value="<%= humidity %>"
+                        placeholder="Example: 80"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        Soil pH
+                    </label>
+
+                    <input
+                        type="number"
+                        name="ph"
+                        step="any"
+                        value="<%= pH %>"
+                        placeholder="Example: 6.5"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group full-width">
+
+                    <label>
+                        Rainfall (mm)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="rainfall"
+                        step="any"
+                        value="<%= rainfall %>"
+                        placeholder="Example: 200"
+                        required
+                    >
+
+                </div>
+
+            </div>
+
+
+            <button type="submit"
+                    class="predict-button">
+
+                🌱 Recommend Crop
+
+            </button>
+
+        </form>
+
+
+        <% if (prediction) { %>
+
+            <div class="result success">
+
+                <div class="result-icon">
+                    🌾
+                </div>
+
+                <div>
+
+                    <span>
+                        Recommended Crop
+                    </span>
+
+                    <h2>
+                        <%= prediction %>
+                    </h2>
+
+                </div>
+
+            </div>
+
+        <% } %>
+
+
+        <% if (error) { %>
+
+            <div class="result error">
+
+                <strong>
+                    Prediction Error
+                </strong>
+
+                <p>
+                    <%= error %>
+                </p>
+
+            </div>
+
+        <% } %>
+
+
+    </div>
+
+</main>
+
+</body>
+
+</html>

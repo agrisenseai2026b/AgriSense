@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AgriSense</title>
+
+</head>
+
+<body>
+
+    <h1>AgriSense</h1>
+
+    <h2>Soil Monitoring Data</h2>
+
+
+    <% if (data) { %>
+
+        <p>
+            <strong>Moisture:</strong>
+            <%= data.moisture %> %
+        </p>
+
+
+        <p>
+            <strong>Temperature:</strong>
+            <%= data.temperature %> °C
+        </p>
+
+
+        <p>
+            <strong>pH:</strong>
+            <%= data.ph %>
+        </p>
+
+
+        <p>
+            <strong>Nitrogen:</strong>
+            <%= data.nitrogen %> mg/kg
+        </p>
+
+
+        <p>
+            <strong>Phosphorus:</strong>
+            <%= data.phosphorus %> mg/kg
+        </p>
+
+
+        <p>
+            <strong>Potassium:</strong>
+            <%= data.potassium %> mg/kg
+        </p>
+
+    <% } else { %>
+
+        <p>No data available.</p>
+
+    <% } %>
+
+
+</body>
+
+</html>
