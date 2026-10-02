@@ -532,7 +532,7 @@ const DISEASE_SCRIPT =
         __dirname,
         "..",
         "plant_disease",
-        "disease_worker.py"
+        "predict.py"
     );
 
 
@@ -541,13 +541,7 @@ const DISEASE_SCRIPT =
 // ============================================================
 
 const PYTHON_COMMAND =
-    process.env.PYTHON_PATH || "python3";
-
-// ============================================================
-// START PERSISTENT DISEASE WORKER
-// ============================================================
-
-startDiseaseWorker();
+    process.env.PYTHON_PATH || "python";
 
 
 // ============================================================
@@ -902,293 +896,7 @@ function runPython(
 
 }
 
-// ============================================================
-// PERSISTENT PLANT DISEASE WORKER
-// ============================================================
 
-let diseaseWorker = null;
-
-let diseaseWorkerBuffer = "";
-
-let diseaseWorkerRequests = [];
-
-
-// ============================================================
-// START DISEASE WORKER
-// ============================================================
-
-function startDiseaseWorker() {
-
-    console.log(
-        "\n========================================"
-    );
-
-    console.log(
-        "STARTING PLANT DISEASE WORKER"
-    );
-
-    console.log(
-        "========================================"
-    );
-
-
-    diseaseWorker = spawn(
-        PYTHON_COMMAND,
-        [
-            path.join(
-                __dirname,
-                "..",
-                "plant_disease",
-                "worker.py"
-            )
-        ],
-        {
-            cwd: path.join(
-                __dirname,
-                "..",
-                "plant_disease"
-            ),
-
-            stdio: [
-                "pipe",
-                "pipe",
-                "pipe"
-            ]
-        }
-    );
-
-
-    // ========================================================
-    // WORKER STDOUT
-    // ========================================================
-
-    diseaseWorker.stdout.on(
-        "data",
-        (data) => {
-
-            diseaseWorkerBuffer +=
-                data.toString();
-
-
-            const lines =
-                diseaseWorkerBuffer.split("\n");
-
-
-            diseaseWorkerBuffer =
-                lines.pop();
-
-
-            for (
-                const line of lines
-            ) {
-
-                const trimmed =
-                    line.trim();
-
-
-                if (!trimmed) {
-                    continue;
-                }
-
-
-                console.log(
-                    "Disease worker result:",
-                    trimmed
-                );
-
-
-                try {
-
-                    const result =
-                        JSON.parse(
-                            trimmed
-                        );
-
-
-                    const request =
-                        diseaseWorkerRequests.shift();
-
-
-                    if (request) {
-
-                        request.resolve(
-                            result
-                        );
-
-                    }
-
-                }
-
-                catch (error) {
-
-                    console.error(
-                        "Disease worker returned invalid JSON:",
-                        trimmed
-                    );
-
-
-                    const request =
-                        diseaseWorkerRequests.shift();
-
-
-                    if (request) {
-
-                        request.reject(
-                            new Error(
-                                "Invalid JSON from disease worker."
-                            )
-                        );
-
-                    }
-
-                }
-
-            }
-
-        }
-    );
-
-
-    // ========================================================
-    // WORKER STDERR
-    // ========================================================
-
-    diseaseWorker.stderr.on(
-        "data",
-        (data) => {
-
-            console.log(
-                "[DISEASE WORKER]",
-                data.toString()
-            );
-
-        }
-    );
-
-
-    // ========================================================
-    // WORKER ERROR
-    // ========================================================
-
-    diseaseWorker.on(
-        "error",
-        (error) => {
-
-            console.error(
-                "Disease worker error:",
-                error
-            );
-
-        }
-    );
-
-
-    // ========================================================
-    // WORKER CLOSED
-    // ========================================================
-
-    diseaseWorker.on(
-        "close",
-        (code) => {
-
-            console.error(
-                "Disease worker stopped.",
-                "Exit code:",
-                code
-            );
-
-
-            diseaseWorker =
-                null;
-
-
-            // Reject pending requests
-
-            while (
-                diseaseWorkerRequests.length > 0
-            ) {
-
-                const request =
-                    diseaseWorkerRequests.shift();
-
-
-                request.reject(
-                    new Error(
-                        "Disease worker stopped."
-                    )
-                );
-
-            }
-
-        }
-    );
-
-}
-
-
-// ============================================================
-// SEND IMAGE TO PERSISTENT WORKER
-// ============================================================
-
-function runDiseasePython(
-    scriptPath,
-    imagePath
-) {
-
-    return new Promise(
-        (
-            resolve,
-            reject
-        ) => {
-
-            if (!diseaseWorker) {
-
-                return reject(
-                    new Error(
-                        "Disease worker is not running."
-                    )
-                );
-
-            }
-
-
-            console.log(
-                "\n========================================"
-            );
-
-            console.log(
-                "SENDING IMAGE TO DISEASE WORKER"
-            );
-
-            console.log(
-                imagePath
-            );
-
-            console.log(
-                "========================================"
-            );
-
-
-            diseaseWorkerRequests.push({
-                resolve: resolve,
-                reject: reject
-            });
-
-
-            diseaseWorker.stdin.write(
-
-                JSON.stringify({
-                    image_path: imagePath
-                })
-
-                + "\n"
-
-            );
-
-        }
-    );
-
-}
 // ============================================================
 // GEMINI TEST API
 // ============================================================
@@ -1988,35 +1696,14 @@ app.post(
                     // RUN PYTHON DISEASE MODEL
                     // ====================================================
 
-                    const imagePath =
-    path.resolve(
-        req.file.path
-    );
-
-
-console.log(
-    "Uploaded image:"
-);
-
-console.log(
-    imagePath
-);
-
-
-const result =
-    await runDiseasePython(
-        DISEASE_SCRIPT,
-        imagePath
-    );
-
-
-console.log(
-    "Disease Prediction Result:"
-);
-
-console.log(
-    result
-);
+                    const result =
+                        await runPython(
+                            DISEASE_SCRIPT,
+                            {
+                                image_path:
+                                    req.file.path
+                            }
+                        );
 
 
                     // ====================================================
@@ -2244,10 +1931,14 @@ app.post(
             console.log(DISEASE_SCRIPT);
 
 
-            const result =
-                await runDiseasePython(
+            const result = await runPython(
+
                 DISEASE_SCRIPT,
-                req.file.path
+
+                {
+                    image_path: req.file.path
+                }
+
             );
 
 
@@ -5085,29 +4776,6 @@ app.get("/api/farm-info", async (req, res) => {
 
 });
 
-// ============================================================
-// START PLANT DISEASE WORKER
-// ============================================================
-
-startDiseaseWorker()
-    .then(() => {
-
-        console.log(
-            "Plant disease model is ready."
-        );
-
-    })
-    .catch((error) => {
-
-        console.error(
-            "Failed to start plant disease worker:"
-        );
-
-        console.error(
-            error
-        );
-
-    });
 
 // ============================================================
 // START SERVER
@@ -5141,7 +4809,7 @@ server.listen(
         );
 
         console.log(
-            `Socket.IO running on the same port: ${PORT}`
+            "Socket.IO running on port 3000"
         );
 
         console.log(
