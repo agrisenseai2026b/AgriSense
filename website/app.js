@@ -899,9 +899,16 @@ function runPython(
 // ============================================================
 // RUN PLANT DISEASE PYTHON MODEL
 // ============================================================
-// IMPORTANT:
-// Disease predict.py expects the image path as sys.argv[1]
-// It does NOT read JSON from stdin.
+// predict.py expects:
+//     python predict.py image_path
+//
+// This function:
+// 1. Starts Python correctly
+// 2. Passes image path as argv[1]
+// 3. Captures stdout/stderr
+// 4. Extracts the FINAL JSON line
+// 5. Handles Python crashes cleanly
+// 6. Prevents the request from hanging forever
 // ============================================================
 
 function runDiseasePython(
@@ -910,10 +917,7 @@ function runDiseasePython(
 ) {
 
     return new Promise(
-        (
-            resolve,
-            reject
-        ) => {
+        (resolve, reject) => {
 
             console.log(
                 "\n========================================"
@@ -945,68 +949,90 @@ function runDiseasePython(
 
 
             // ====================================================
-            // IMPORTANT
-            // PASS IMAGE PATH AS COMMAND-LINE ARGUMENT
+            // START PYTHON
             // ====================================================
 
-            const python =
-                spawn(
-                    PYTHON_COMMAND,
-                    [
-                        scriptPath,
-                        imagePath
-                    ],
-                    {
-                        cwd:
-                            path.dirname(
-                                scriptPath
-                            )
+            const python = spawn(
+                PYTHON_COMMAND,
+                [
+                    scriptPath,
+                    imagePath
+                ],
+                {
+                    cwd: path.dirname(scriptPath),
+
+                    env: {
+                        ...process.env,
+
+                        PYTHONUNBUFFERED: "1"
                     }
-                );
+                }
+            );
 
 
-            let output = "";
-
-            let errorOutput = "";
+            let stdout = "";
+            let stderr = "";
 
 
             // ====================================================
-            // STDOUT
+            // PYTHON STDOUT
             // ====================================================
 
             python.stdout.on(
                 "data",
                 (data) => {
 
-                    output +=
+                    const text =
                         data.toString();
+
+                    stdout += text;
+
+                    console.log(
+                        "[PYTHON]",
+                        text.trim()
+                    );
 
                 }
             );
 
 
             // ====================================================
-            // STDERR
+            // PYTHON STDERR
             // ====================================================
 
             python.stderr.on(
                 "data",
                 (data) => {
 
-                    errorOutput +=
+                    const text =
                         data.toString();
+
+                    stderr += text;
+
+                    console.error(
+                        "[PYTHON ERROR]",
+                        text.trim()
+                    );
 
                 }
             );
 
 
             // ====================================================
-            // PROCESS ERROR
+            // PYTHON START ERROR
             // ====================================================
 
             python.on(
                 "error",
                 (error) => {
+
+                    console.error(
+                        "Could not start Python:"
+                    );
+
+                    console.error(
+                        error
+                    );
 
                     reject(
                         error
@@ -1017,93 +1043,126 @@ function runDiseasePython(
 
 
             // ====================================================
-            // PROCESS CLOSED
+            // PYTHON FINISHED
             // ====================================================
 
             python.on(
                 "close",
-                (code) => {
+                (code, signal) => {
 
                     console.log(
-                        "Disease Python exit code:",
+                        "\n========================================"
+                    );
+
+                    console.log(
+                        "DISEASE PYTHON FINISHED"
+                    );
+
+                    console.log(
+                        "Exit code:",
                         code
                     );
 
-
-                    if (errorOutput) {
-
-                        console.log(
-                            "Disease Python logs:"
-                        );
-
-                        console.log(
-                            errorOutput
-                        );
-
-                    }
-
-
                     console.log(
-                        "Disease Python stdout:"
+                        "Signal:",
+                        signal
                     );
 
                     console.log(
-                        output
+                        "========================================"
                     );
 
 
                     // =================================================
-                    // PYTHON FAILED
+                    // PYTHON PROCESS FAILED
                     // =================================================
 
                     if (code !== 0) {
 
-                        try {
-
-                            const lines =
-                                output
-                                    .trim()
-                                    .split("\n");
+                        console.error(
+                            "Disease Python failed."
+                        );
 
 
-                            const lastLine =
-                                lines[
-                                    lines.length - 1
-                                ];
+                        // ---------------------------------------------
+                        // Try to extract JSON error
+                        // ---------------------------------------------
 
-
-                            const pythonResult =
-                                JSON.parse(
-                                    lastLine
+                        const lines =
+                            stdout
+                                .trim()
+                                .split("\n")
+                                .filter(
+                                    line =>
+                                        line.trim()
                                 );
 
 
-                            if (
-                                pythonResult.error
-                            ) {
+                        for (
+                            let i =
+                                lines.length - 1;
+                            i >= 0;
+                            i--
+                        ) {
 
-                                reject(
-                                    new Error(
-                                        pythonResult.error
-                                    )
-                                );
+                            try {
 
-                                return;
+                                const parsed =
+                                    JSON.parse(
+                                        lines[i]
+                                    );
+
+
+                                if (
+                                    parsed &&
+                                    parsed.error
+                                ) {
+
+                                    reject(
+                                        new Error(
+                                            parsed.error
+                                        )
+                                    );
+
+                                    return;
+
+                                }
+
+                            }
+
+                            catch (e) {
+
+                                // Continue searching
 
                             }
 
                         }
 
-                        catch (parseError) {
 
-                            // Ignore JSON parsing error
+                        // ---------------------------------------------
+                        // Process killed
+                        // ---------------------------------------------
+
+                        if (signal) {
+
+                            reject(
+                                new Error(
+                                    `Disease Python process was terminated by ${signal}.`
+                                )
+                            );
+
+                            return;
 
                         }
 
 
+                        // ---------------------------------------------
+                        // Normal Python error
+                        // ---------------------------------------------
+
                         reject(
                             new Error(
-                                errorOutput ||
+                                stderr.trim() ||
                                 `Disease Python process exited with code ${code}.`
                             )
                         );
@@ -1114,11 +1173,21 @@ function runDiseasePython(
 
 
                     // =================================================
-                    // EMPTY OUTPUT
+                    // PYTHON SUCCESS
                     // =================================================
 
+                    const lines =
+                        stdout
+                            .trim()
+                            .split("\n")
+                            .filter(
+                                line =>
+                                    line.trim()
+                            );
+
+
                     if (
-                        !output.trim()
+                        lines.length === 0
                     ) {
 
                         reject(
@@ -1133,53 +1202,112 @@ function runDiseasePython(
 
 
                     // =================================================
-                    // PARSE FINAL JSON LINE
+                    // FIND FINAL JSON LINE
                     // =================================================
 
-                    try {
-
-                        const lines =
-                            output
-                                .trim()
-                                .split("\n");
+                    let result = null;
 
 
-                        const lastLine =
-                            lines[
-                                lines.length - 1
-                            ];
+                    for (
+                        let i =
+                            lines.length - 1;
+                        i >= 0;
+                        i--
+                    ) {
+
+                        try {
+
+                            const parsed =
+                                JSON.parse(
+                                    lines[i]
+                                );
 
 
-                        const result =
-                            JSON.parse(
-                                lastLine
-                            );
+                            if (
+                                parsed &&
+                                typeof parsed === "object"
+                            ) {
 
+                                result =
+                                    parsed;
 
-                        resolve(
-                            result
-                        );
+                                break;
+
+                            }
+
+                        }
+
+                        catch (e) {
+
+                            // Continue searching upward
+
+                        }
 
                     }
 
-                    catch (error) {
 
-                        console.log(
-                            "Unable to parse disease JSON:"
+                    // =================================================
+                    // NO JSON FOUND
+                    // =================================================
+
+                    if (!result) {
+
+                        console.error(
+                            "Complete Python stdout:"
                         );
 
-                        console.log(
-                            output
+                        console.error(
+                            stdout
                         );
 
 
                         reject(
                             new Error(
-                                "Invalid JSON response from disease model."
+                                "Disease Python returned invalid JSON."
                             )
                         );
 
+                        return;
+
                     }
+
+
+                    // =================================================
+                    // PYTHON RETURNED ERROR
+                    // =================================================
+
+                    if (
+                        result.success === false
+                    ) {
+
+                        reject(
+                            new Error(
+                                result.error ||
+                                "Disease prediction failed."
+                            )
+                        );
+
+                        return;
+
+                    }
+
+
+                    // =================================================
+                    // SUCCESS
+                    // =================================================
+
+                    console.log(
+                        "\nDisease Prediction Result:"
+                    );
+
+                    console.log(
+                        result
+                    );
+
+
+                    resolve(
+                        result
+                    );
 
                 }
             );
@@ -1188,7 +1316,6 @@ function runDiseasePython(
     );
 
 }
-
 // ============================================================
 // GEMINI TEST API
 // ============================================================
