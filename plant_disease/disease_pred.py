@@ -4,6 +4,8 @@ import json
 import torch
 import torch.nn as nn
 
+torch.set_num_threads(1)
+
 from PIL import Image
 from torchvision import transforms, models
 
@@ -27,10 +29,7 @@ MODEL_PATH = os.path.join(
 # DEVICE
 # ============================================================
 
-DEVICE = torch.device(
-    "cuda" if torch.cuda.is_available()
-    else "cpu"
-)
+DEVICE = torch.device("cpu")
 
 
 # ============================================================
@@ -175,7 +174,7 @@ def predict_disease(
     )
 
 
-    with torch.no_grad():
+    with torch.inference_mode():
 
         outputs = model(
             image_tensor
