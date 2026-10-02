@@ -541,7 +541,7 @@ const DISEASE_SCRIPT =
 // ============================================================
 
 const PYTHON_COMMAND =
-    process.env.PYTHON_PATH || "python";
+    process.env.PYTHON_PATH || "python3";
 
 
 // ============================================================
@@ -5110,7 +5110,7 @@ server.listen(
         );
 
         console.log(
-            "Socket.IO running on port 3000"
+            `Socket.IO running on the same port: ${PORT}`
         );
 
         console.log(
