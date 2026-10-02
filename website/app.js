@@ -1550,12 +1550,435 @@ const upload = multer({
 
 
 // ============================================================
-// RUN PYTHON
+// PERSISTENT PLANT DISEASE PYTHON WORKER
 // ============================================================
 
-function runPython(
-    scriptPath,
-    inputData
+let diseaseWorker = null;
+let diseaseWorkerReady = false;
+let diseaseWorkerStarting = false;
+
+let diseaseWorkerBuffer = "";
+
+let diseaseWorkerRequests = [];
+
+let diseaseWorkerCurrentRequest = null;
+
+
+// ============================================================
+// START DISEASE WORKER
+// ============================================================
+
+function startDiseaseWorker() {
+
+    if (
+        diseaseWorkerStarting ||
+        diseaseWorker
+    ) {
+        return;
+    }
+
+    diseaseWorkerStarting = true;
+
+    console.log("");
+    console.log("========================================");
+    console.log("STARTING PLANT DISEASE WORKER");
+    console.log("========================================");
+
+    const workerScript = path.join(
+        __dirname,
+        "..",
+        "plant_disease",
+        "disease_worker.py"
+    );
+
+    console.log(
+        "Python worker:"
+    );
+
+    console.log(
+        workerScript
+    );
+
+    console.log(
+        "========================================"
+    );
+
+
+    diseaseWorker = spawn(
+        PYTHON_PATH,
+        [
+            workerScript
+        ],
+        {
+            cwd: path.join(
+                __dirname,
+                "..",
+                "plant_disease"
+            ),
+
+            stdio: [
+                "pipe",
+                "pipe",
+                "pipe"
+            ]
+        }
+    );
+
+
+    diseaseWorkerStarting = false;
+
+
+    // ========================================================
+    // PYTHON STDOUT
+    // ========================================================
+
+    diseaseWorker.stdout.on(
+        "data",
+        (data) => {
+
+            diseaseWorkerBuffer +=
+                data.toString();
+
+
+            const lines =
+                diseaseWorkerBuffer.split("\n");
+
+
+            diseaseWorkerBuffer =
+                lines.pop();
+
+
+            for (
+                const line of lines
+            ) {
+
+                const cleanLine =
+                    line.trim();
+
+
+                if (!cleanLine) {
+                    continue;
+                }
+
+
+                let message;
+
+
+                try {
+
+                    message =
+                        JSON.parse(
+                            cleanLine
+                        );
+
+                }
+
+                catch (error) {
+
+                    console.log(
+                        "[DISEASE WORKER]",
+                        cleanLine
+                    );
+
+                    continue;
+
+                }
+
+
+                // =================================================
+                // MODEL READY
+                // =================================================
+
+                if (
+                    message.type === "ready"
+                ) {
+
+                    diseaseWorkerReady =
+                        true;
+
+
+                    console.log("");
+                    console.log(
+                        "========================================"
+                    );
+
+                    console.log(
+                        "PLANT DISEASE MODEL READY"
+                    );
+
+                    console.log(
+                        "Model loaded successfully."
+                    );
+
+                    console.log(
+                        "Waiting for images..."
+                    );
+
+                    console.log(
+                        "========================================"
+                    );
+
+
+                    processNextDiseaseRequest();
+
+                    continue;
+
+                }
+
+
+                // =================================================
+                // STARTUP ERROR
+                // =================================================
+
+                if (
+                    message.type ===
+                    "startup_error"
+                ) {
+
+                    console.error(
+                        "Disease worker startup error:"
+                    );
+
+                    console.error(
+                        message.error
+                    );
+
+                    continue;
+
+                }
+
+
+                // =================================================
+                // PREDICTION RESULT
+                // =================================================
+
+                if (
+                    message.type ===
+                    "result"
+                ) {
+
+                    if (
+                        diseaseWorkerCurrentRequest
+                    ) {
+
+                        const request =
+                            diseaseWorkerCurrentRequest;
+
+
+                        diseaseWorkerCurrentRequest =
+                            null;
+
+
+                        if (
+                            message.success
+                        ) {
+
+                            request.resolve(
+                                message
+                            );
+
+                        }
+
+                        else {
+
+                            request.reject(
+                                new Error(
+                                    message.error ||
+                                    "Disease prediction failed."
+                                )
+                            );
+
+                        }
+
+                    }
+
+
+                    processNextDiseaseRequest();
+
+                }
+
+            }
+
+        }
+    );
+
+
+    // ========================================================
+    // PYTHON STDERR
+    // ========================================================
+
+    diseaseWorker.stderr.on(
+        "data",
+        (data) => {
+
+            console.error(
+                "[DISEASE WORKER ERROR]",
+                data.toString()
+            );
+
+        }
+    );
+
+
+    // ========================================================
+    // PYTHON PROCESS ERROR
+    // ========================================================
+
+    diseaseWorker.on(
+        "error",
+        (error) => {
+
+            console.error(
+                "Disease worker process error:"
+            );
+
+            console.error(
+                error
+            );
+
+
+            diseaseWorkerReady =
+                false;
+
+            diseaseWorkerStarting =
+                false;
+
+        }
+    );
+
+
+    // ========================================================
+    // PYTHON PROCESS CLOSED
+    // ========================================================
+
+    diseaseWorker.on(
+        "close",
+        (code) => {
+
+            console.log(
+                "Disease worker exited with code:",
+                code
+            );
+
+
+            diseaseWorker =
+                null;
+
+            diseaseWorkerReady =
+                false;
+
+            diseaseWorkerStarting =
+                false;
+
+
+            if (
+                diseaseWorkerCurrentRequest
+            ) {
+
+                diseaseWorkerCurrentRequest.reject(
+                    new Error(
+                        "Disease prediction worker stopped."
+                    )
+                );
+
+                diseaseWorkerCurrentRequest =
+                    null;
+
+            }
+
+
+            while (
+                diseaseWorkerRequests.length
+            ) {
+
+                const request =
+                    diseaseWorkerRequests.shift();
+
+
+                request.reject(
+                    new Error(
+                        "Disease prediction worker stopped."
+                    )
+                );
+
+            }
+
+        }
+    );
+
+}
+
+
+// ============================================================
+// PROCESS NEXT DISEASE REQUEST
+// ============================================================
+
+function processNextDiseaseRequest() {
+
+    if (!diseaseWorker) {
+        return;
+    }
+
+
+    if (!diseaseWorkerReady) {
+        return;
+    }
+
+
+    if (diseaseWorkerCurrentRequest) {
+        return;
+    }
+
+
+    if (
+        diseaseWorkerRequests.length === 0
+    ) {
+        return;
+    }
+
+
+    const request =
+        diseaseWorkerRequests.shift();
+
+
+    diseaseWorkerCurrentRequest =
+        request;
+
+
+    console.log("");
+    console.log(
+        "========================================"
+    );
+
+    console.log(
+        "SENDING IMAGE TO DISEASE WORKER"
+    );
+
+    console.log(
+        request.imagePath
+    );
+
+    console.log(
+        "========================================"
+    );
+
+
+    diseaseWorker.stdin.write(
+        JSON.stringify({
+            image_path:
+                request.imagePath
+        }) + "\n"
+    );
+
+}
+
+
+// ============================================================
+// DISEASE PREDICTION
+// ============================================================
+
+function runDiseasePrediction(
+    imagePath
 ) {
 
     return new Promise(
@@ -1564,242 +1987,21 @@ function runPython(
             reject
         ) => {
 
-            console.log(
-                "\n----------------------------------------"
-            );
+            diseaseWorkerRequests.push({
 
-            console.log(
-                "Running Python:"
-            );
+                imagePath:
+                    imagePath,
 
-            console.log(
-                scriptPath
-            );
+                resolve:
+                    resolve,
 
-            console.log(
-                "Input:"
-            );
+                reject:
+                    reject
 
-            console.log(
-                inputData
-            );
+            });
 
-            console.log(
-                "----------------------------------------"
-            );
 
-
-            const python = spawn(
-                PYTHON_COMMAND,
-                [
-                    scriptPath
-                ],
-                {
-                    cwd: path.dirname(scriptPath)
-                }
-            );
-
-
-            let output = "";
-
-            let errorOutput = "";
-
-
-            // =================================================
-            // STDOUT
-            // =================================================
-
-            python.stdout.on(
-                "data",
-                (data) => {
-
-                    output += data.toString();
-
-                }
-            );
-
-
-            // =================================================
-            // STDERR
-            // =================================================
-
-            python.stderr.on(
-                "data",
-                (data) => {
-
-                    errorOutput += data.toString();
-
-                }
-            );
-
-
-            // =================================================
-            // PROCESS ERROR
-            // =================================================
-
-            python.on(
-                "error",
-                (error) => {
-
-                    reject(error);
-
-                }
-            );
-
-
-            // =================================================
-            // PROCESS CLOSED
-            // =================================================
-
-            python.on(
-                "close",
-                (code) => {
-
-                    console.log(
-                        "Python exit code:",
-                        code
-                    );
-
-
-                    if (errorOutput) {
-
-                        console.log(
-                            "Python stderr:"
-                        );
-
-                        console.log(
-                            errorOutput
-                        );
-
-                    }
-
-
-                    console.log(
-                        "Python stdout:"
-                    );
-
-                    console.log(
-                        output
-                    );
-
-
-                    // -----------------------------------------
-                    // PYTHON FAILED
-                    // -----------------------------------------
-
-                    if (code !== 0) {
-
-                        // Try to read JSON error from stdout
-
-                        try {
-
-                            const pythonResult =
-                                JSON.parse(
-                                    output.trim()
-                                );
-
-
-                            if (
-                                pythonResult.error
-                            ) {
-
-                                reject(
-                                    new Error(
-                                        pythonResult.error
-                                    )
-                                );
-
-                                return;
-
-                            }
-
-                        }
-
-                        catch (parseError) {
-
-                            // Ignore JSON parse error
-                            // because process itself failed
-
-                        }
-
-
-                        reject(
-                            new Error(
-                                errorOutput ||
-                                `Python process exited with code ${code}.`
-                            )
-                        );
-
-                        return;
-
-                    }
-
-
-                    // -----------------------------------------
-                    // EMPTY OUTPUT
-                    // -----------------------------------------
-
-                    if (
-                        !output.trim()
-                    ) {
-
-                        reject(
-                            new Error(
-                                "Python returned empty output."
-                            )
-                        );
-
-                        return;
-
-                    }
-
-
-                    // -----------------------------------------
-                    // PARSE JSON
-                    // -----------------------------------------
-
-                    try {
-
-                        const result =
-                            JSON.parse(
-                                output.trim()
-                            );
-
-
-                        resolve(
-                            result
-                        );
-
-                    }
-
-                    catch (error) {
-
-                        reject(
-                            new Error(
-                                "Invalid JSON response from Python: "
-                                +
-                                output
-                            )
-                        );
-
-                    }
-
-                }
-            );
-
-
-            // =================================================
-            // SEND INPUT TO PYTHON
-            // =================================================
-
-            python.stdin.write(
-                JSON.stringify(
-                    inputData
-                )
-            );
-
-
-            python.stdin.end();
+            processNextDiseaseRequest();
 
         }
     );
@@ -1807,6 +2009,11 @@ function runPython(
 }
 
 
+// ============================================================
+// START WORKER
+// ============================================================
+
+startDiseaseWorker();
 // ============================================================
 // GEMINI TEST API
 // ============================================================
