@@ -6,107 +6,50 @@ import os
 
 print(
     "========================================",
-    flush=True
+    file=sys.stderr
 )
 
 print(
     "PLANT DISEASE PREDICTION STARTED",
-    flush=True
+    file=sys.stderr
 )
 
 print(
     "========================================",
-    flush=True
+    file=sys.stderr
 )
 
 
 try:
 
     # ============================================================
-    # READ INPUT FROM NODE.JS STDIN
+    # GET IMAGE PATH FROM COMMAND LINE
     # ============================================================
 
-    input_data = sys.stdin.read().strip()
-
-
-    print(
-        "Raw input received:",
-        input_data,
-        flush=True
-    )
-
-
-    # ============================================================
-    # CHECK INPUT
-    # ============================================================
-
-    if not input_data:
-
-        print(
-            json.dumps({
-                "success": False,
-                "error": "No input received from website."
-            }),
-            flush=True
-        )
-
-        sys.exit(1)
-
-
-    # ============================================================
-    # PARSE JSON
-    # ============================================================
-
-    try:
-
-        data = json.loads(input_data)
-
-    except json.JSONDecodeError as e:
-
-        print(
-            json.dumps({
-                "success": False,
-                "error": "Invalid JSON input: " + str(e)
-            }),
-            flush=True
-        )
-
-        sys.exit(1)
-
-
-    # ============================================================
-    # GET IMAGE PATH
-    # ============================================================
-
-    image_path = data.get("image_path")
-
-
-    print(
-        "Image path received:",
-        image_path,
-        flush=True
-    )
-
-
-    # ============================================================
-    # CHECK IMAGE PATH
-    # ============================================================
-
-    if not image_path:
+    if len(sys.argv) < 2:
 
         print(
             json.dumps({
                 "success": False,
                 "error": "Image path not provided."
-            }),
-            flush=True
+            })
         )
 
         sys.exit(1)
 
 
+    image_path = sys.argv[1]
+
+
+    print(
+        "Image path:",
+        image_path,
+        file=sys.stderr
+    )
+
+
     # ============================================================
-    # CHECK IMAGE FILE
+    # CHECK IMAGE
     # ============================================================
 
     if not os.path.exists(image_path):
@@ -114,19 +57,16 @@ try:
         print(
             json.dumps({
                 "success": False,
-                "error":
-                    "Image file does not exist: "
-                    + image_path
-            }),
-            flush=True
+                "error": "Image file does not exist."
+            })
         )
 
         sys.exit(1)
 
 
     print(
-        "Image exists successfully.",
-        flush=True
+        "Image exists.",
+        file=sys.stderr
     )
 
 
@@ -136,7 +76,7 @@ try:
 
     print(
         "Importing disease_pred...",
-        flush=True
+        file=sys.stderr
     )
 
 
@@ -145,7 +85,7 @@ try:
 
     print(
         "disease_pred imported successfully.",
-        flush=True
+        file=sys.stderr
     )
 
 
@@ -154,8 +94,8 @@ try:
     # ============================================================
 
     print(
-        "Starting disease prediction...",
-        flush=True
+        "Starting prediction...",
+        file=sys.stderr
     )
 
 
@@ -166,17 +106,16 @@ try:
 
     print(
         "Prediction completed.",
-        flush=True
+        file=sys.stderr
     )
 
 
     # ============================================================
-    # RETURN RESULT
+    # RETURN ONLY JSON TO STDOUT
     # ============================================================
 
     print(
-        json.dumps(result),
-        flush=True
+        json.dumps(result)
     )
 
 
@@ -184,29 +123,30 @@ except Exception as e:
 
     print(
         "========================================",
-        flush=True
+        file=sys.stderr
     )
 
     print(
         "PLANT DISEASE ERROR",
-        flush=True
+        file=sys.stderr
     )
 
     print(
         str(e),
-        flush=True
+        file=sys.stderr
     )
 
 
-    traceback.print_exc()
+    traceback.print_exc(
+        file=sys.stderr
+    )
 
 
     print(
         json.dumps({
             "success": False,
             "error": str(e)
-        }),
-        flush=True
+        })
     )
 
 
