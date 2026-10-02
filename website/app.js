@@ -528,12 +528,19 @@ const IRRIGATION_SCRIPT =
 
 
 const DISEASE_SCRIPT =
-    path.join(
-        __dirname,
-        "..",
-        "plant_disease",
-        "predict.py"
-    );
+    spawn(
+    PYTHON_PATH,
+    [
+        path.join(
+            __dirname,
+            "..",
+            "plant_disease",
+            "predict.py"
+        ),
+
+        imagePath
+    ]
+);
 
 
 // ============================================================
