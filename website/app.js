@@ -543,6 +543,12 @@ const DISEASE_SCRIPT =
 const PYTHON_COMMAND =
     process.env.PYTHON_PATH || "python3";
 
+// ============================================================
+// START PERSISTENT DISEASE WORKER
+// ============================================================
+
+startDiseaseWorker();
+
 
 // ============================================================
 // MULTER CONFIGURATION
@@ -1200,16 +1206,237 @@ function startDiseaseWorker() {
 
 
 // ============================================================
-// RUN DISEASE PREDICTION
+// PERSISTENT PLANT DISEASE WORKER
 // ============================================================
 
-async function runDiseasePython(
+let diseaseWorker = null;
+
+let diseaseWorkerBuffer = "";
+
+let diseaseWorkerRequests = [];
+
+
+// ============================================================
+// START DISEASE WORKER
+// ============================================================
+
+function startDiseaseWorker() {
+
+    console.log(
+        "\n========================================"
+    );
+
+    console.log(
+        "STARTING PLANT DISEASE WORKER"
+    );
+
+    console.log(
+        "========================================"
+    );
+
+
+    diseaseWorker = spawn(
+        PYTHON_COMMAND,
+        [
+            path.join(
+                __dirname,
+                "..",
+                "plant_disease",
+                "worker.py"
+            )
+        ],
+        {
+            cwd: path.join(
+                __dirname,
+                "..",
+                "plant_disease"
+            ),
+
+            stdio: [
+                "pipe",
+                "pipe",
+                "pipe"
+            ]
+        }
+    );
+
+
+    // ========================================================
+    // WORKER STDOUT
+    // ========================================================
+
+    diseaseWorker.stdout.on(
+        "data",
+        (data) => {
+
+            diseaseWorkerBuffer +=
+                data.toString();
+
+
+            const lines =
+                diseaseWorkerBuffer.split("\n");
+
+
+            diseaseWorkerBuffer =
+                lines.pop();
+
+
+            for (
+                const line of lines
+            ) {
+
+                const trimmed =
+                    line.trim();
+
+
+                if (!trimmed) {
+                    continue;
+                }
+
+
+                console.log(
+                    "Disease worker result:",
+                    trimmed
+                );
+
+
+                try {
+
+                    const result =
+                        JSON.parse(
+                            trimmed
+                        );
+
+
+                    const request =
+                        diseaseWorkerRequests.shift();
+
+
+                    if (request) {
+
+                        request.resolve(
+                            result
+                        );
+
+                    }
+
+                }
+
+                catch (error) {
+
+                    console.error(
+                        "Disease worker returned invalid JSON:",
+                        trimmed
+                    );
+
+
+                    const request =
+                        diseaseWorkerRequests.shift();
+
+
+                    if (request) {
+
+                        request.reject(
+                            new Error(
+                                "Invalid JSON from disease worker."
+                            )
+                        );
+
+                    }
+
+                }
+
+            }
+
+        }
+    );
+
+
+    // ========================================================
+    // WORKER STDERR
+    // ========================================================
+
+    diseaseWorker.stderr.on(
+        "data",
+        (data) => {
+
+            console.log(
+                "[DISEASE WORKER]",
+                data.toString()
+            );
+
+        }
+    );
+
+
+    // ========================================================
+    // WORKER ERROR
+    // ========================================================
+
+    diseaseWorker.on(
+        "error",
+        (error) => {
+
+            console.error(
+                "Disease worker error:",
+                error
+            );
+
+        }
+    );
+
+
+    // ========================================================
+    // WORKER CLOSED
+    // ========================================================
+
+    diseaseWorker.on(
+        "close",
+        (code) => {
+
+            console.error(
+                "Disease worker stopped.",
+                "Exit code:",
+                code
+            );
+
+
+            diseaseWorker =
+                null;
+
+
+            // Reject pending requests
+
+            while (
+                diseaseWorkerRequests.length > 0
+            ) {
+
+                const request =
+                    diseaseWorkerRequests.shift();
+
+
+                request.reject(
+                    new Error(
+                        "Disease worker stopped."
+                    )
+                );
+
+            }
+
+        }
+    );
+
+}
+
+
+// ============================================================
+// SEND IMAGE TO PERSISTENT WORKER
+// ============================================================
+
+function runDiseasePython(
     scriptPath,
     imagePath
 ) {
-
-    await startDiseaseWorker();
-
 
     return new Promise(
         (
@@ -1217,18 +1444,13 @@ async function runDiseasePython(
             reject
         ) => {
 
-            if (
-                !diseaseWorker ||
-                !diseaseWorkerReady
-            ) {
+            if (!diseaseWorker) {
 
-                reject(
+                return reject(
                     new Error(
-                        "Disease worker is not ready."
+                        "Disease worker is not running."
                     )
                 );
-
-                return;
 
             }
 
@@ -1250,36 +1472,26 @@ async function runDiseasePython(
             );
 
 
-            // Add request to queue
-
-            diseaseRequests.push({
-
-                resolve:
-                    resolve,
-
-                reject:
-                    reject
-
+            diseaseWorkerRequests.push({
+                resolve: resolve,
+                reject: reject
             });
 
 
-            // Send image path
-
             diseaseWorker.stdin.write(
+
                 JSON.stringify({
+                    image_path: imagePath
+                })
 
-                    image_path:
-                        imagePath
+                + "\n"
 
-                }) +
-                "\n"
             );
 
         }
     );
 
 }
-
 // ============================================================
 // GEMINI TEST API
 // ============================================================
