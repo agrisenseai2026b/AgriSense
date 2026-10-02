@@ -1,124 +1,137 @@
 import sys
 import json
+import traceback
 import os
 
-from disease_pred import predict_disease
+print("========================================", flush=True)
+print("PLANT DISEASE PREDICTION STARTED", flush=True)
+print("========================================", flush=True)
 
 
-# ============================================================
-# GET IMAGE PATH
-# ============================================================
+try:
 
-def get_image_path():
+    # ============================================================
+    # CHECK ARGUMENT
+    # ============================================================
 
-    # --------------------------------------------------------
-    # OPTION 1:
-    # Image path supplied as command-line argument
-    # --------------------------------------------------------
-
-    if len(sys.argv) >= 2:
-        return sys.argv[1]
-
-    # --------------------------------------------------------
-    # OPTION 2:
-    # Image path supplied through JSON stdin
-    # Used by Node.js website
-    # --------------------------------------------------------
-
-    input_data = sys.stdin.read().strip()
-
-    if not input_data:
-        return None
-
-    try:
-        data = json.loads(input_data)
-
-    except json.JSONDecodeError:
-        return None
-
-    return (
-        data.get("image_path")
-        or data.get("file_path")
-        or data.get("filePath")
-        or data.get("path")
-    )
-
-
-# ============================================================
-# MAIN
-# ============================================================
-
-def main():
-
-    try:
-
-        # ----------------------------------------------------
-        # Get image path
-        # ----------------------------------------------------
-
-        image_path = get_image_path()
-
-        if not image_path:
-
-            print(
-                json.dumps({
-                    "success": False,
-                    "error": "No image path was provided."
-                })
-            )
-
-            sys.exit(1)
-
-        # ----------------------------------------------------
-        # Convert to absolute path
-        # ----------------------------------------------------
-
-        image_path = os.path.abspath(image_path)
-
-        # ----------------------------------------------------
-        # Check image
-        # ----------------------------------------------------
-
-        if not os.path.isfile(image_path):
-
-            print(
-                json.dumps({
-                    "success": False,
-                    "error": "Image file not found: " + image_path
-                })
-            )
-
-            sys.exit(1)
-
-        # ----------------------------------------------------
-        # Prediction
-        # ----------------------------------------------------
-
-        result = predict_disease(image_path)
-
-        # ----------------------------------------------------
-        # stdout MUST contain only JSON
-        # ----------------------------------------------------
-
-        print(
-            json.dumps(result)
-        )
-
-    except Exception as e:
+    if len(sys.argv) < 2:
 
         print(
             json.dumps({
                 "success": False,
-                "error": str(e)
-            })
+                "error": "Image path not provided."
+            }),
+            flush=True
         )
 
         sys.exit(1)
 
 
-# ============================================================
-# RUN
-# ============================================================
+    image_path = sys.argv[1]
 
-if __name__ == "__main__":
-    main()
+    print(
+        "Image path:",
+        image_path,
+        flush=True
+    )
+
+
+    # ============================================================
+    # CHECK IMAGE
+    # ============================================================
+
+    if not os.path.exists(image_path):
+
+        print(
+            json.dumps({
+                "success": False,
+                "error": "Image file does not exist."
+            }),
+            flush=True
+        )
+
+        sys.exit(1)
+
+
+    print(
+        "Image exists.",
+        flush=True
+    )
+
+
+    # ============================================================
+    # IMPORT DISEASE MODEL
+    # ============================================================
+
+    print(
+        "Importing disease_pred...",
+        flush=True
+    )
+
+    from disease_pred import predict_disease
+
+
+    print(
+        "disease_pred imported successfully.",
+        flush=True
+    )
+
+
+    # ============================================================
+    # RUN PREDICTION
+    # ============================================================
+
+    print(
+        "Starting prediction...",
+        flush=True
+    )
+
+    result = predict_disease(
+        image_path
+    )
+
+
+    print(
+        "Prediction completed.",
+        flush=True
+    )
+
+
+    # ============================================================
+    # RETURN RESULT
+    # ============================================================
+
+    print(
+        json.dumps(result),
+        flush=True
+    )
+
+
+except Exception as e:
+
+    print(
+        "========================================",
+        flush=True
+    )
+
+    print(
+        "PLANT DISEASE ERROR",
+        flush=True
+    )
+
+    print(
+        str(e),
+        flush=True
+    )
+
+    traceback.print_exc()
+
+    print(
+        json.dumps({
+            "success": False,
+            "error": str(e)
+        }),
+        flush=True
+    )
+
+    sys.exit(1)
