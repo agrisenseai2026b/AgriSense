@@ -3,18 +3,96 @@ import json
 import traceback
 import os
 
-print("========================================", flush=True)
-print("PLANT DISEASE PREDICTION STARTED", flush=True)
-print("========================================", flush=True)
+
+print(
+    "========================================",
+    flush=True
+)
+
+print(
+    "PLANT DISEASE PREDICTION STARTED",
+    flush=True
+)
+
+print(
+    "========================================",
+    flush=True
+)
 
 
 try:
 
     # ============================================================
-    # CHECK ARGUMENT
+    # READ INPUT FROM NODE.JS STDIN
     # ============================================================
 
-    if len(sys.argv) < 2:
+    input_data = sys.stdin.read().strip()
+
+
+    print(
+        "Raw input received:",
+        input_data,
+        flush=True
+    )
+
+
+    # ============================================================
+    # CHECK INPUT
+    # ============================================================
+
+    if not input_data:
+
+        print(
+            json.dumps({
+                "success": False,
+                "error": "No input received from website."
+            }),
+            flush=True
+        )
+
+        sys.exit(1)
+
+
+    # ============================================================
+    # PARSE JSON
+    # ============================================================
+
+    try:
+
+        data = json.loads(input_data)
+
+    except json.JSONDecodeError as e:
+
+        print(
+            json.dumps({
+                "success": False,
+                "error": "Invalid JSON input: " + str(e)
+            }),
+            flush=True
+        )
+
+        sys.exit(1)
+
+
+    # ============================================================
+    # GET IMAGE PATH
+    # ============================================================
+
+    image_path = data.get("image_path")
+
+
+    print(
+        "Image path received:",
+        image_path,
+        flush=True
+    )
+
+
+    # ============================================================
+    # CHECK IMAGE PATH
+    # ============================================================
+
+    if not image_path:
 
         print(
             json.dumps({
@@ -27,17 +105,8 @@ try:
         sys.exit(1)
 
 
-    image_path = sys.argv[1]
-
-    print(
-        "Image path:",
-        image_path,
-        flush=True
-    )
-
-
     # ============================================================
-    # CHECK IMAGE
+    # CHECK IMAGE FILE
     # ============================================================
 
     if not os.path.exists(image_path):
@@ -45,7 +114,9 @@ try:
         print(
             json.dumps({
                 "success": False,
-                "error": "Image file does not exist."
+                "error":
+                    "Image file does not exist: "
+                    + image_path
             }),
             flush=True
         )
@@ -54,7 +125,7 @@ try:
 
 
     print(
-        "Image exists.",
+        "Image exists successfully.",
         flush=True
     )
 
@@ -67,6 +138,7 @@ try:
         "Importing disease_pred...",
         flush=True
     )
+
 
     from disease_pred import predict_disease
 
@@ -82,9 +154,10 @@ try:
     # ============================================================
 
     print(
-        "Starting prediction...",
+        "Starting disease prediction...",
         flush=True
     )
+
 
     result = predict_disease(
         image_path
@@ -124,7 +197,9 @@ except Exception as e:
         flush=True
     )
 
+
     traceback.print_exc()
+
 
     print(
         json.dumps({
@@ -133,5 +208,6 @@ except Exception as e:
         }),
         flush=True
     )
+
 
     sys.exit(1)
