@@ -410,24 +410,31 @@ function processNextDiseaseRequest() {
 }
 
 // ============================================================
-// RUN DISEASE PREDICTION
+// RUN DISEASE PREDICTION (WITH 30s TIMEOUT)
 // ============================================================
 
 function runDiseasePrediction(imagePath) {
     return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            reject(new Error("Disease prediction request timed out after 30 seconds."));
+        }, 30000);
+
         diseaseWorkerRequests.push({
             imagePath: imagePath,
-            resolve: resolve,
-            reject: reject
+            resolve: (res) => {
+                clearTimeout(timeout);
+                resolve(res);
+            },
+            reject: (err) => {
+                clearTimeout(timeout);
+                reject(err);
+            }
         });
         processNextDiseaseRequest();
     });
 }
 
-// ============================================================
-// START PLANT DISEASE WORKER
-// ============================================================
-
+// Start disease worker process immediately
 startDiseaseWorker();
 
 // ============================================================
@@ -517,7 +524,7 @@ async function getLatestSensorData() {
 }
 
 // ============================================================
-// GET WEATHER DATA FROM OPEN-METEO
+// GET WEATHER DATA FROM OPEN-METEO (WITH 5s TIMEOUT)
 // ============================================================
 
 function getWeatherData() {
@@ -531,7 +538,7 @@ function getWeatherData() {
             `&current=relative_humidity_2m,wind_speed_10m` +
             `&timezone=Asia%2FKolkata`;
 
-        https.get(url, (response) => {
+        const req = https.get(url, (response) => {
             let data = "";
             response.on("data", (chunk) => { data += chunk; });
             response.on("end", () => {
@@ -545,7 +552,14 @@ function getWeatherData() {
                     reject(error);
                 }
             });
-        }).on("error", (error) => {
+        });
+
+        req.setTimeout(5000, () => {
+            req.destroy();
+            reject(new Error("Weather API network request timed out."));
+        });
+
+        req.on("error", (error) => {
             reject(error);
         });
     });
@@ -568,7 +582,7 @@ app.get("/", async (req, res) => {
             humidity = weather.humidity;
             windSpeed = weather.windSpeed;
         } catch (weatherError) {
-            console.log("Weather API error:", weatherError);
+            console.log("Weather API error:", weatherError.message);
         }
 
         res.render("index", {
@@ -804,7 +818,7 @@ app.get("/crop-recommendation", async (req, res) => {
             const weather = await getWeatherData();
             humidity = weather.humidity;
         } catch (weatherError) {
-            console.log("Weather API error on crop page:", weatherError);
+            console.log("Weather API error on crop page:", weatherError.message);
         }
 
         res.render("crop", {
@@ -843,7 +857,7 @@ app.get("/fertilizer-prediction", async (req, res) => {
             const weather = await getWeatherData();
             humidity = weather.humidity;
         } catch (weatherError) {
-            console.log("Weather API error for fertilizer page:", weatherError);
+            console.log("Weather API error for fertilizer page:", weatherError.message);
         }
 
         res.render("fertilizer", {
@@ -889,7 +903,7 @@ app.get("/water-irrigation", async (req, res) => {
         try {
             weather = await getWeatherData();
         } catch (weatherError) {
-            console.log("Weather data fetch error:", weatherError);
+            console.log("Weather data fetch error:", weatherError.message);
         }
 
         res.render("irrigation", {
