@@ -896,6 +896,286 @@ function runPython(
 
 }
 
+// ============================================================
+// RUN PLANT DISEASE PYTHON MODEL
+// ============================================================
+
+function runDiseasePython(
+    scriptPath,
+    imagePath
+) {
+
+    return new Promise(
+        (
+            resolve,
+            reject
+        ) => {
+
+            console.log(
+                "\n========================================"
+            );
+
+            console.log(
+                "RUNNING PLANT DISEASE MODEL"
+            );
+
+            console.log(
+                "Python script:"
+            );
+
+            console.log(
+                scriptPath
+            );
+
+            console.log(
+                "Image path:"
+            );
+
+            console.log(
+                imagePath
+            );
+
+            console.log(
+                "========================================"
+            );
+
+
+            const python =
+                spawn(
+                    PYTHON_COMMAND,
+                    [
+                        scriptPath,
+                        imagePath
+                    ],
+                    {
+                        cwd:
+                            path.dirname(
+                                scriptPath
+                            )
+                    }
+                );
+
+
+            let output = "";
+
+            let errorOutput = "";
+
+
+            // =================================================
+            // STDOUT
+            // =================================================
+
+            python.stdout.on(
+                "data",
+                (data) => {
+
+                    output +=
+                        data.toString();
+
+                }
+            );
+
+
+            // =================================================
+            // STDERR
+            // =================================================
+
+            python.stderr.on(
+                "data",
+                (data) => {
+
+                    errorOutput +=
+                        data.toString();
+
+                }
+            );
+
+
+            // =================================================
+            // PROCESS ERROR
+            // =================================================
+
+            python.on(
+                "error",
+                (error) => {
+
+                    reject(error);
+
+                }
+            );
+
+
+            // =================================================
+            // PROCESS CLOSED
+            // =================================================
+
+            python.on(
+                "close",
+                (code) => {
+
+                    console.log(
+                        "Disease Python exit code:",
+                        code
+                    );
+
+
+                    if (errorOutput) {
+
+                        console.log(
+                            "Disease Python logs:"
+                        );
+
+                        console.log(
+                            errorOutput
+                        );
+
+                    }
+
+
+                    console.log(
+                        "Disease Python stdout:"
+                    );
+
+                    console.log(
+                        output
+                    );
+
+
+                    // -----------------------------------------
+                    // PYTHON FAILED
+                    // -----------------------------------------
+
+                    if (code !== 0) {
+
+                        try {
+
+                            const lines =
+                                output
+                                    .trim()
+                                    .split("\n");
+
+                            const lastLine =
+                                lines[
+                                    lines.length - 1
+                                ];
+
+                            const pythonResult =
+                                JSON.parse(
+                                    lastLine
+                                );
+
+
+                            if (
+                                pythonResult.error
+                            ) {
+
+                                reject(
+                                    new Error(
+                                        pythonResult.error
+                                    )
+                                );
+
+                                return;
+
+                            }
+
+                        }
+
+                        catch (parseError) {
+
+                            // Ignore JSON parsing error
+
+                        }
+
+
+                        reject(
+                            new Error(
+                                errorOutput ||
+                                `Disease Python process exited with code ${code}.`
+                            )
+                        );
+
+                        return;
+
+                    }
+
+
+                    // -----------------------------------------
+                    // EMPTY OUTPUT
+                    // -----------------------------------------
+
+                    if (
+                        !output.trim()
+                    ) {
+
+                        reject(
+                            new Error(
+                                "Disease Python returned empty output."
+                            )
+                        );
+
+                        return;
+
+                    }
+
+
+                    // -----------------------------------------
+                    // PARSE FINAL JSON LINE
+                    // -----------------------------------------
+
+                    try {
+
+                        const lines =
+                            output
+                                .trim()
+                                .split("\n");
+
+
+                        const lastLine =
+                            lines[
+                                lines.length - 1
+                            ];
+
+
+                        const result =
+                            JSON.parse(
+                                lastLine
+                            );
+
+
+                        resolve(
+                            result
+                        );
+
+                    }
+
+                    catch (error) {
+
+                        console.log(
+                            "Unable to parse disease JSON:"
+                        );
+
+                        console.log(
+                            output
+                        );
+
+
+                        reject(
+                            new Error(
+                                "Invalid JSON response from disease model."
+                            )
+                        );
+
+                    }
+
+                }
+            );
+
+        }
+    );
+
+}
+
 
 // ============================================================
 // GEMINI TEST API
@@ -1696,14 +1976,35 @@ app.post(
                     // RUN PYTHON DISEASE MODEL
                     // ====================================================
 
-                    const result =
-                        await runPython(
-                            DISEASE_SCRIPT,
-                            {
-                                image_path:
-                                    req.file.path
-                            }
-                        );
+                    const imagePath =
+    path.resolve(
+        req.file.path
+    );
+
+
+console.log(
+    "Uploaded image:"
+);
+
+console.log(
+    imagePath
+);
+
+
+const result =
+    await runDiseasePython(
+        DISEASE_SCRIPT,
+        imagePath
+    );
+
+
+console.log(
+    "Disease Prediction Result:"
+);
+
+console.log(
+    result
+);
 
 
                     // ====================================================
