@@ -596,6 +596,514 @@ const DISEASE_SCRIPT =
 const PYTHON_COMMAND =
     process.env.PYTHON_PATH || "python";
 
+// ============================================================
+// PERSISTENT PLANT DISEASE WORKER
+// ============================================================
+
+let diseaseWorker = null;
+
+let diseaseWorkerReady = false;
+
+let diseaseWorkerStarting = false;
+
+let diseaseWorkerBuffer = "";
+
+let diseaseWorkerRequests = [];
+
+let diseaseWorkerCurrentRequest = null;
+
+
+// ============================================================
+// START DISEASE WORKER
+// ============================================================
+
+function startDiseaseWorker() {
+
+    if (
+        diseaseWorker ||
+        diseaseWorkerStarting
+    ) {
+
+        return;
+
+    }
+
+
+    diseaseWorkerStarting = true;
+
+
+    const workerScript =
+        path.join(
+            __dirname,
+            "..",
+            "plant_disease",
+            "disease_worker.py"
+        );
+
+
+    console.log("");
+
+    console.log(
+        "========================================"
+    );
+
+    console.log(
+        "STARTING PLANT DISEASE WORKER"
+    );
+
+    console.log(
+        "Worker:"
+    );
+
+    console.log(
+        workerScript
+    );
+
+    console.log(
+        "========================================"
+    );
+
+
+    diseaseWorker =
+        spawn(
+            PYTHON_COMMAND,
+            [
+                workerScript
+            ],
+            {
+                cwd:
+                    path.join(
+                        __dirname,
+                        "..",
+                        "plant_disease"
+                    ),
+
+                stdio: [
+                    "pipe",
+                    "pipe",
+                    "pipe"
+                ]
+            }
+        );
+
+
+    diseaseWorkerStarting = false;
+
+
+    // ========================================================
+    // STDOUT
+    // ========================================================
+
+    diseaseWorker.stdout.on(
+        "data",
+        (data) => {
+
+            diseaseWorkerBuffer +=
+                data.toString();
+
+
+            const lines =
+                diseaseWorkerBuffer.split(
+                    "\n"
+                );
+
+
+            diseaseWorkerBuffer =
+                lines.pop();
+
+
+            for (
+                const line of lines
+            ) {
+
+                const cleanLine =
+                    line.trim();
+
+
+                if (
+                    !cleanLine
+                ) {
+
+                    continue;
+
+                }
+
+
+                let message;
+
+
+                try {
+
+                    message =
+                        JSON.parse(
+                            cleanLine
+                        );
+
+                }
+
+                catch (error) {
+
+                    console.log(
+                        "[DISEASE WORKER]",
+                        cleanLine
+                    );
+
+                    continue;
+
+                }
+
+
+                // =================================================
+                // MODEL READY
+                // =================================================
+
+                if (
+                    message.type ===
+                    "ready"
+                ) {
+
+                    diseaseWorkerReady =
+                        true;
+
+
+                    console.log("");
+
+                    console.log(
+                        "========================================"
+                    );
+
+                    console.log(
+                        "PLANT DISEASE MODEL READY"
+                    );
+
+                    console.log(
+                        "Model loaded and waiting for images."
+                    );
+
+                    console.log(
+                        "========================================"
+                    );
+
+
+                    processNextDiseaseRequest();
+
+
+                    continue;
+
+                }
+
+
+                // =================================================
+                // STARTUP ERROR
+                // =================================================
+
+                if (
+                    message.type ===
+                    "startup_error"
+                ) {
+
+                    console.error(
+                        "Disease worker startup error:"
+                    );
+
+                    console.error(
+                        message.error
+                    );
+
+
+                    continue;
+
+                }
+
+
+                // =================================================
+                // PREDICTION RESULT
+                // =================================================
+
+                if (
+                    message.type ===
+                    "result"
+                ) {
+
+                    if (
+                        diseaseWorkerCurrentRequest
+                    ) {
+
+                        const request =
+                            diseaseWorkerCurrentRequest;
+
+
+                        diseaseWorkerCurrentRequest =
+                            null;
+
+
+                        if (
+                            message.success
+                        ) {
+
+                            request.resolve(
+                                message
+                            );
+
+                        }
+
+                        else {
+
+                            request.reject(
+                                new Error(
+                                    message.error ||
+                                    "Disease prediction failed."
+                                )
+                            );
+
+                        }
+
+                    }
+
+
+                    processNextDiseaseRequest();
+
+                }
+
+            }
+
+        }
+    );
+
+
+    // ========================================================
+    // STDERR
+    // ========================================================
+
+    diseaseWorker.stderr.on(
+        "data",
+        (data) => {
+
+            console.error(
+                "[DISEASE WORKER ERROR]",
+                data.toString()
+            );
+
+        }
+    );
+
+
+    // ========================================================
+    // ERROR
+    // ========================================================
+
+    diseaseWorker.on(
+        "error",
+        (error) => {
+
+            console.error(
+                "Disease worker process error:"
+            );
+
+            console.error(
+                error
+            );
+
+
+            diseaseWorker =
+                null;
+
+            diseaseWorkerReady =
+                false;
+
+            diseaseWorkerStarting =
+                false;
+
+        }
+    );
+
+
+    // ========================================================
+    // CLOSE
+    // ========================================================
+
+    diseaseWorker.on(
+        "close",
+        (code) => {
+
+            console.log(
+                "Disease worker exited with code:",
+                code
+            );
+
+
+            diseaseWorker =
+                null;
+
+            diseaseWorkerReady =
+                false;
+
+            diseaseWorkerStarting =
+                false;
+
+
+            if (
+                diseaseWorkerCurrentRequest
+            ) {
+
+                diseaseWorkerCurrentRequest.reject(
+                    new Error(
+                        "Disease prediction worker stopped."
+                    )
+                );
+
+
+                diseaseWorkerCurrentRequest =
+                    null;
+
+            }
+
+
+            while (
+                diseaseWorkerRequests.length
+            ) {
+
+                const request =
+                    diseaseWorkerRequests.shift();
+
+
+                request.reject(
+                    new Error(
+                        "Disease prediction worker stopped."
+                    )
+                );
+
+            }
+
+        }
+    );
+
+}
+
+
+// ============================================================
+// PROCESS NEXT REQUEST
+// ============================================================
+
+function processNextDiseaseRequest() {
+
+    if (
+        !diseaseWorker
+    ) {
+
+        return;
+
+    }
+
+
+    if (
+        !diseaseWorkerReady
+    ) {
+
+        return;
+
+    }
+
+
+    if (
+        diseaseWorkerCurrentRequest
+    ) {
+
+        return;
+
+    }
+
+
+    if (
+        diseaseWorkerRequests.length === 0
+    ) {
+
+        return;
+
+    }
+
+
+    const request =
+        diseaseWorkerRequests.shift();
+
+
+    diseaseWorkerCurrentRequest =
+        request;
+
+
+    console.log("");
+
+    console.log(
+        "========================================"
+    );
+
+    console.log(
+        "SENDING IMAGE TO DISEASE WORKER"
+    );
+
+    console.log(
+        request.imagePath
+    );
+
+    console.log(
+        "========================================"
+    );
+
+
+    diseaseWorker.stdin.write(
+        JSON.stringify({
+
+            image_path:
+                request.imagePath
+
+        }) + "\n"
+    );
+
+}
+
+
+// ============================================================
+// PUBLIC DISEASE PREDICTION FUNCTION
+// ============================================================
+
+function runDiseasePrediction(
+    imagePath
+) {
+
+    return new Promise(
+        (
+            resolve,
+            reject
+        ) => {
+
+            diseaseWorkerRequests.push({
+
+                imagePath:
+                    imagePath,
+
+                resolve:
+                    resolve,
+
+                reject:
+                    reject
+
+            });
+
+
+            processNextDiseaseRequest();
+
+        }
+    );
+
+}
+
+
+// ============================================================
+// START WORKER ON SERVER START
+// ============================================================
+
+startDiseaseWorker();
+
 
 // ============================================================
 // MULTER CONFIGURATION
@@ -1830,14 +2338,34 @@ app.post(
                     // RUN PYTHON DISEASE MODEL
                     // ====================================================
 
-                    const result =
-                        await runPython(
-                            DISEASE_SCRIPT,
-                            {
-                                image_path:
-                                    req.file.path
-                            }
+                    const imagePath =
+                        path.resolve(
+                            req.file.path
                         );
+                    
+                    
+                    console.log(
+                        "\nUploaded image:"
+                    );
+                    
+                    console.log(
+                        imagePath
+                    );
+                    
+                    
+                    const result =
+                        await runDiseasePrediction(
+                            imagePath
+                    );
+                    
+                    
+                    console.log(
+                        "Disease Prediction Result:"
+                    );
+                    
+                    console.log(
+                        result
+                    );
 
 
                     // ====================================================
