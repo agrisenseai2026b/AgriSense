@@ -1,6 +1,21 @@
 import sys
 import json
+import os
 import traceback
+
+
+# ============================================================
+# SEND JSON ONLY
+# ============================================================
+
+def send(data):
+
+    sys.stdout.write(
+        json.dumps(data) + "\n"
+    )
+
+    sys.stdout.flush()
+
 
 # ============================================================
 # LOAD MODEL ONCE
@@ -10,34 +25,28 @@ try:
 
     from disease_pred import predict_disease
 
-    # Tell Node.js that the model is ready.
-    # IMPORTANT: stdout is used only for JSON communication.
-    print(
-        json.dumps({
-            "type": "ready"
-        }),
-        flush=True
-    )
+    send({
+        "type": "ready",
+        "success": True
+    })
 
 except Exception as e:
-
-    print(
-        json.dumps({
-            "type": "startup_error",
-            "error": str(e)
-        }),
-        flush=True
-    )
 
     traceback.print_exc(
         file=sys.stderr
     )
 
+    send({
+        "type": "startup_error",
+        "success": False,
+        "error": str(e)
+    })
+
     sys.exit(1)
 
 
 # ============================================================
-# WAIT FOR IMAGE REQUESTS
+# WAIT FOR REQUESTS
 # ============================================================
 
 for line in sys.stdin:
@@ -50,27 +59,15 @@ for line in sys.stdin:
             continue
 
 
+        # ----------------------------------------------------
+        # REQUEST MUST BE JSON
+        # ----------------------------------------------------
+
         request = json.loads(line)
 
 
         # ----------------------------------------------------
-        # PING
-        # ----------------------------------------------------
-
-        if request.get("type") == "ping":
-
-            print(
-                json.dumps({
-                    "type": "pong"
-                }),
-                flush=True
-            )
-
-            continue
-
-
-        # ----------------------------------------------------
-        # PREDICTION
+        # GET IMAGE PATH
         # ----------------------------------------------------
 
         image_path = request.get(
@@ -80,53 +77,56 @@ for line in sys.stdin:
 
         if not image_path:
 
-            print(
-                json.dumps({
-                    "type": "result",
-                    "success": False,
-                    "error": "Image path not provided."
-                }),
-                flush=True
-            )
+            send({
+                "type": "result",
+                "success": False,
+                "error": "Image path not provided."
+            })
+
+            continue
+
+
+        image_path = str(
+            image_path
+        ).strip()
+
+
+        # ----------------------------------------------------
+        # CHECK FILE
+        # ----------------------------------------------------
+
+        if not os.path.isfile(
+            image_path
+        ):
+
+            send({
+                "type": "result",
+                "success": False,
+                "error":
+                    "Image file does not exist: "
+                    + image_path
+            })
 
             continue
 
 
         # ----------------------------------------------------
-        # RUN ALREADY-LOADED MODEL
+        # PREDICT
         # ----------------------------------------------------
 
-        try:
-
-            result = predict_disease(
-                image_path
-            )
+        result = predict_disease(
+            image_path
+        )
 
 
-            print(
-                json.dumps({
-                    "type": "result",
-                    **result
-                }),
-                flush=True
-            )
+        # ----------------------------------------------------
+        # SEND RESULT
+        # ----------------------------------------------------
 
-
-        except Exception as e:
-
-            traceback.print_exc(
-                file=sys.stderr
-            )
-
-
-            print(
-                json.dumps({
-                    "type": "result",
-                    "success": False,
-                    "error": str(e)
-                }),
-                flush=True
-            )
+        send({
+            "type": "result",
+            **result
+        })
 
 
     except Exception as e:
@@ -135,12 +135,8 @@ for line in sys.stdin:
             file=sys.stderr
         )
 
-
-        print(
-            json.dumps({
-                "type": "result",
-                "success": False,
-                "error": str(e)
-            }),
-            flush=True
-        )
+        send({
+            "type": "result",
+            "success": False,
+            "error": str(e)
+        })
