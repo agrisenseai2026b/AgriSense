@@ -9,14 +9,6 @@ const https = require("https");
 const http = require("http");
 const { Server } = require("socket.io");
 
-let cachedWeather = {
-    humidity: 0,
-    windSpeed: 0,
-    updatedAt: 0
-};
-
-const WEATHER_CACHE_TIME = 30 * 60 * 1000; // 30 minutes
-
 const PYTHON_PATH =
     process.env.PYTHON_PATH || "python";
 
@@ -36,7 +28,7 @@ const { askGemini } = require("./ai/gemini");
 // ============================================================
 const app = express();
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // ============================================================
 // HTTP SERVER + SOCKET.IO
@@ -301,52 +293,7 @@ mongoose
         console.log(error);
 
     });
-
-getWeatherData()
-    .then((weather) => {
-
-        currentHumidity =
-            weather.humidity;
-
-        currentWindSpeed =
-            weather.windSpeed;
-
-        console.log(
-            "========================================"
-        );
-
-        console.log(
-            "CURRENT WEATHER"
-        );
-
-        console.log(
-            "Humidity:",
-            currentHumidity + "%"
-        );
-
-        console.log(
-            "Wind Speed:",
-            currentWindSpeed + " km/h"
-        );
-
-        console.log(
-            "========================================"
-        );
-
-    })
-    .catch((error) => {
-
-        console.error(
-            "Initial weather fetch failed:",
-            error.message
-        );
-
-    });
-
-
-
-
-
+    
 
 // ============================================================
 // REAL-TIME FARM INFORMATION CHANGE STREAM
@@ -595,514 +542,6 @@ const DISEASE_SCRIPT =
 
 const PYTHON_COMMAND =
     process.env.PYTHON_PATH || "python";
-
-// ============================================================
-// PERSISTENT PLANT DISEASE WORKER
-// ============================================================
-
-let diseaseWorker = null;
-
-let diseaseWorkerReady = false;
-
-let diseaseWorkerStarting = false;
-
-let diseaseWorkerBuffer = "";
-
-let diseaseWorkerRequests = [];
-
-let diseaseWorkerCurrentRequest = null;
-
-
-// ============================================================
-// START DISEASE WORKER
-// ============================================================
-
-function startDiseaseWorker() {
-
-    if (
-        diseaseWorker ||
-        diseaseWorkerStarting
-    ) {
-
-        return;
-
-    }
-
-
-    diseaseWorkerStarting = true;
-
-
-    const workerScript =
-        path.join(
-            __dirname,
-            "..",
-            "plant_disease",
-            "disease_worker.py"
-        );
-
-
-    console.log("");
-
-    console.log(
-        "========================================"
-    );
-
-    console.log(
-        "STARTING PLANT DISEASE WORKER"
-    );
-
-    console.log(
-        "Worker:"
-    );
-
-    console.log(
-        workerScript
-    );
-
-    console.log(
-        "========================================"
-    );
-
-
-    diseaseWorker =
-        spawn(
-            PYTHON_COMMAND,
-            [
-                workerScript
-            ],
-            {
-                cwd:
-                    path.join(
-                        __dirname,
-                        "..",
-                        "plant_disease"
-                    ),
-
-                stdio: [
-                    "pipe",
-                    "pipe",
-                    "pipe"
-                ]
-            }
-        );
-
-
-    diseaseWorkerStarting = false;
-
-
-    // ========================================================
-    // STDOUT
-    // ========================================================
-
-    diseaseWorker.stdout.on(
-        "data",
-        (data) => {
-
-            diseaseWorkerBuffer +=
-                data.toString();
-
-
-            const lines =
-                diseaseWorkerBuffer.split(
-                    "\n"
-                );
-
-
-            diseaseWorkerBuffer =
-                lines.pop();
-
-
-            for (
-                const line of lines
-            ) {
-
-                const cleanLine =
-                    line.trim();
-
-
-                if (
-                    !cleanLine
-                ) {
-
-                    continue;
-
-                }
-
-
-                let message;
-
-
-                try {
-
-                    message =
-                        JSON.parse(
-                            cleanLine
-                        );
-
-                }
-
-                catch (error) {
-
-                    console.log(
-                        "[DISEASE WORKER]",
-                        cleanLine
-                    );
-
-                    continue;
-
-                }
-
-
-                // =================================================
-                // MODEL READY
-                // =================================================
-
-                if (
-                    message.type ===
-                    "ready"
-                ) {
-
-                    diseaseWorkerReady =
-                        true;
-
-
-                    console.log("");
-
-                    console.log(
-                        "========================================"
-                    );
-
-                    console.log(
-                        "PLANT DISEASE MODEL READY"
-                    );
-
-                    console.log(
-                        "Model loaded and waiting for images."
-                    );
-
-                    console.log(
-                        "========================================"
-                    );
-
-
-                    processNextDiseaseRequest();
-
-
-                    continue;
-
-                }
-
-
-                // =================================================
-                // STARTUP ERROR
-                // =================================================
-
-                if (
-                    message.type ===
-                    "startup_error"
-                ) {
-
-                    console.error(
-                        "Disease worker startup error:"
-                    );
-
-                    console.error(
-                        message.error
-                    );
-
-
-                    continue;
-
-                }
-
-
-                // =================================================
-                // PREDICTION RESULT
-                // =================================================
-
-                if (
-                    message.type ===
-                    "result"
-                ) {
-
-                    if (
-                        diseaseWorkerCurrentRequest
-                    ) {
-
-                        const request =
-                            diseaseWorkerCurrentRequest;
-
-
-                        diseaseWorkerCurrentRequest =
-                            null;
-
-
-                        if (
-                            message.success
-                        ) {
-
-                            request.resolve(
-                                message
-                            );
-
-                        }
-
-                        else {
-
-                            request.reject(
-                                new Error(
-                                    message.error ||
-                                    "Disease prediction failed."
-                                )
-                            );
-
-                        }
-
-                    }
-
-
-                    processNextDiseaseRequest();
-
-                }
-
-            }
-
-        }
-    );
-
-
-    // ========================================================
-    // STDERR
-    // ========================================================
-
-    diseaseWorker.stderr.on(
-        "data",
-        (data) => {
-
-            console.error(
-                "[DISEASE WORKER ERROR]",
-                data.toString()
-            );
-
-        }
-    );
-
-
-    // ========================================================
-    // ERROR
-    // ========================================================
-
-    diseaseWorker.on(
-        "error",
-        (error) => {
-
-            console.error(
-                "Disease worker process error:"
-            );
-
-            console.error(
-                error
-            );
-
-
-            diseaseWorker =
-                null;
-
-            diseaseWorkerReady =
-                false;
-
-            diseaseWorkerStarting =
-                false;
-
-        }
-    );
-
-
-    // ========================================================
-    // CLOSE
-    // ========================================================
-
-    diseaseWorker.on(
-        "close",
-        (code) => {
-
-            console.log(
-                "Disease worker exited with code:",
-                code
-            );
-
-
-            diseaseWorker =
-                null;
-
-            diseaseWorkerReady =
-                false;
-
-            diseaseWorkerStarting =
-                false;
-
-
-            if (
-                diseaseWorkerCurrentRequest
-            ) {
-
-                diseaseWorkerCurrentRequest.reject(
-                    new Error(
-                        "Disease prediction worker stopped."
-                    )
-                );
-
-
-                diseaseWorkerCurrentRequest =
-                    null;
-
-            }
-
-
-            while (
-                diseaseWorkerRequests.length
-            ) {
-
-                const request =
-                    diseaseWorkerRequests.shift();
-
-
-                request.reject(
-                    new Error(
-                        "Disease prediction worker stopped."
-                    )
-                );
-
-            }
-
-        }
-    );
-
-}
-
-
-// ============================================================
-// PROCESS NEXT REQUEST
-// ============================================================
-
-function processNextDiseaseRequest() {
-
-    if (
-        !diseaseWorker
-    ) {
-
-        return;
-
-    }
-
-
-    if (
-        !diseaseWorkerReady
-    ) {
-
-        return;
-
-    }
-
-
-    if (
-        diseaseWorkerCurrentRequest
-    ) {
-
-        return;
-
-    }
-
-
-    if (
-        diseaseWorkerRequests.length === 0
-    ) {
-
-        return;
-
-    }
-
-
-    const request =
-        diseaseWorkerRequests.shift();
-
-
-    diseaseWorkerCurrentRequest =
-        request;
-
-
-    console.log("");
-
-    console.log(
-        "========================================"
-    );
-
-    console.log(
-        "SENDING IMAGE TO DISEASE WORKER"
-    );
-
-    console.log(
-        request.imagePath
-    );
-
-    console.log(
-        "========================================"
-    );
-
-
-    diseaseWorker.stdin.write(
-        JSON.stringify({
-
-            image_path:
-                request.imagePath
-
-        }) + "\n"
-    );
-
-}
-
-
-// ============================================================
-// PUBLIC DISEASE PREDICTION FUNCTION
-// ============================================================
-
-function runDiseasePrediction(
-    imagePath
-) {
-
-    return new Promise(
-        (
-            resolve,
-            reject
-        ) => {
-
-            diseaseWorkerRequests.push({
-
-                imagePath:
-                    imagePath,
-
-                resolve:
-                    resolve,
-
-                reject:
-                    reject
-
-            });
-
-
-            processNextDiseaseRequest();
-
-        }
-    );
-
-}
-
-
-// ============================================================
-// START WORKER ON SERVER START
-// ============================================================
-
-startDiseaseWorker();
 
 
 // ============================================================
@@ -1577,22 +1016,7 @@ function getWeatherData() {
 
     return new Promise((resolve, reject) => {
 
-        // Use cached weather if it is still fresh
-        if (
-            cachedWeather.updatedAt &&
-            Date.now() - cachedWeather.updatedAt < WEATHER_CACHE_TIME
-        ) {
-
-            console.log("Using cached weather data");
-
-            resolve({
-                humidity: cachedWeather.humidity,
-                windSpeed: cachedWeather.windSpeed
-            });
-
-            return;
-        }
-
+        // Nagpur location
         const latitude = 21.1458;
         const longitude = 79.0882;
 
@@ -1603,89 +1027,33 @@ function getWeatherData() {
             `&current=relative_humidity_2m,wind_speed_10m` +
             `&timezone=Asia%2FKolkata`;
 
-        console.log("Requesting fresh weather data...");
-
         https.get(url, (response) => {
 
-            let body = "";
+            let data = "";
 
             response.on("data", (chunk) => {
-                body += chunk.toString();
+                data += chunk;
             });
 
             response.on("end", () => {
 
-                console.log(
-                    "Weather HTTP status:",
-                    response.statusCode
-                );
-
-                if (response.statusCode !== 200) {
-
-                    console.log(
-                        "Weather API failed:",
-                        body
-                    );
-
-                    // If old cached data exists, keep using it
-                    if (cachedWeather.updatedAt) {
-
-                        resolve({
-                            humidity: cachedWeather.humidity,
-                            windSpeed: cachedWeather.windSpeed
-                        });
-
-                    } else {
-
-                        resolve({
-                            humidity: 0,
-                            windSpeed: 0
-                        });
-
-                    }
-
-                    return;
-                }
-
                 try {
 
-                    const result = JSON.parse(body);
-
-                    const humidity =
-                        result.current?.relative_humidity_2m ?? 0;
-
-                    const windSpeed =
-                        result.current?.wind_speed_10m ?? 0;
-
-                    // Save weather in memory
-                    cachedWeather = {
-                        humidity: humidity,
-                        windSpeed: windSpeed,
-                        updatedAt: Date.now()
-                    };
-
-                    console.log(
-                        "Fresh weather:",
-                        humidity + "%",
-                        windSpeed + " km/h"
-                    );
+                    const result = JSON.parse(data);
 
                     resolve({
-                        humidity: humidity,
-                        windSpeed: windSpeed
+
+                        humidity:
+                            result.current?.relative_humidity_2m ?? null,
+
+                        windSpeed:
+                            result.current?.wind_speed_10m ?? null
+
                     });
 
                 } catch (error) {
 
-                    console.log(
-                        "Weather JSON error:",
-                        error.message
-                    );
-
-                    resolve({
-                        humidity: cachedWeather.humidity || 0,
-                        windSpeed: cachedWeather.windSpeed || 0
-                    });
+                    reject(error);
 
                 }
 
@@ -1693,15 +1061,7 @@ function getWeatherData() {
 
         }).on("error", (error) => {
 
-            console.log(
-                "Weather network error:",
-                error.message
-            );
-
-            resolve({
-                humidity: cachedWeather.humidity || 0,
-                windSpeed: cachedWeather.windSpeed || 0
-            });
+            reject(error);
 
         });
 
@@ -1752,8 +1112,6 @@ app.get("/", async (req, res) => {
 
         let humidity = null;
         let windSpeed = null;
-        let currentHumidity = 0;
-        let currentWindSpeed = 0;
 
         try {
 
@@ -2338,34 +1696,14 @@ app.post(
                     // RUN PYTHON DISEASE MODEL
                     // ====================================================
 
-                    const imagePath =
-                        path.resolve(
-                            req.file.path
-                        );
-                    
-                    
-                    console.log(
-                        "\nUploaded image:"
-                    );
-                    
-                    console.log(
-                        imagePath
-                    );
-                    
-                    
                     const result =
-                        await runDiseasePrediction(
-                            imagePath
-                    );
-                    
-                    
-                    console.log(
-                        "Disease Prediction Result:"
-                    );
-                    
-                    console.log(
-                        result
-                    );
+                        await runPython(
+                            DISEASE_SCRIPT,
+                            {
+                                image_path:
+                                    req.file.path
+                            }
+                        );
 
 
                     // ====================================================
