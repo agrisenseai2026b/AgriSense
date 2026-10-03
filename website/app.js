@@ -293,7 +293,52 @@ mongoose
         console.log(error);
 
     });
-    
+
+getWeatherData()
+    .then((weather) => {
+
+        currentHumidity =
+            weather.humidity;
+
+        currentWindSpeed =
+            weather.windSpeed;
+
+        console.log(
+            "========================================"
+        );
+
+        console.log(
+            "CURRENT WEATHER"
+        );
+
+        console.log(
+            "Humidity:",
+            currentHumidity + "%"
+        );
+
+        console.log(
+            "Wind Speed:",
+            currentWindSpeed + " km/h"
+        );
+
+        console.log(
+            "========================================"
+        );
+
+    })
+    .catch((error) => {
+
+        console.error(
+            "Initial weather fetch failed:",
+            error.message
+        );
+
+    });
+
+
+
+
+
 
 // ============================================================
 // REAL-TIME FARM INFORMATION CHANGE STREAM
@@ -1013,10 +1058,8 @@ async function getLatestSensorData() {
 // ============================================================
 
 function getWeatherData() {
-
     return new Promise((resolve, reject) => {
 
-        // Nagpur location
         const latitude = 21.1458;
         const longitude = 79.0882;
 
@@ -1029,44 +1072,44 @@ function getWeatherData() {
 
         https.get(url, (response) => {
 
-            let data = "";
+            let body = "";
 
             response.on("data", (chunk) => {
-                data += chunk;
+                body += chunk;
             });
 
             response.on("end", () => {
 
                 try {
 
-                    const result = JSON.parse(data);
+                    const result = JSON.parse(body);
+
+                    if (!result.current) {
+                        reject(
+                            new Error("Current weather data unavailable")
+                        );
+                        return;
+                    }
 
                     resolve({
-
                         humidity:
-                            result.current?.relative_humidity_2m ?? null,
+                            result.current.relative_humidity_2m,
 
                         windSpeed:
-                            result.current?.wind_speed_10m ?? null
-
+                            result.current.wind_speed_10m
                     });
 
                 } catch (error) {
-
                     reject(error);
-
                 }
 
             });
 
         }).on("error", (error) => {
-
             reject(error);
-
         });
 
     });
-
 }
 
 
@@ -1112,6 +1155,8 @@ app.get("/", async (req, res) => {
 
         let humidity = null;
         let windSpeed = null;
+        let currentHumidity = 0;
+        let currentWindSpeed = 0;
 
         try {
 
