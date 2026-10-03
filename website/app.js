@@ -9,6 +9,14 @@ const https = require("https");
 const http = require("http");
 const { Server } = require("socket.io");
 
+let cachedWeather = {
+    humidity: 0,
+    windSpeed: 0,
+    updatedAt: 0
+};
+
+const WEATHER_CACHE_TIME = 30 * 60 * 1000; // 30 minutes
+
 const PYTHON_PATH =
     process.env.PYTHON_PATH || "python";
 
@@ -1057,13 +1065,25 @@ async function getLatestSensorData() {
 // GET WEATHER DATA FROM OPEN-METEO
 // ============================================================
 
-// ============================================================
-// GET CURRENT WEATHER DATA
-// ============================================================
-
 function getWeatherData() {
 
     return new Promise((resolve, reject) => {
+
+        // Use cached weather if it is still fresh
+        if (
+            cachedWeather.updatedAt &&
+            Date.now() - cachedWeather.updatedAt < WEATHER_CACHE_TIME
+        ) {
+
+            console.log("Using cached weather data");
+
+            resolve({
+                humidity: cachedWeather.humidity,
+                windSpeed: cachedWeather.windSpeed
+            });
+
+            return;
+        }
 
         const latitude = 21.1458;
         const longitude = 79.0882;
@@ -1075,10 +1095,7 @@ function getWeatherData() {
             `&current=relative_humidity_2m,wind_speed_10m` +
             `&timezone=Asia%2FKolkata`;
 
-        console.log("========================================");
-        console.log("REQUESTING WEATHER DATA");
-        console.log(url);
-        console.log("========================================");
+        console.log("Requesting fresh weather data...");
 
         https.get(url, (response) => {
 
@@ -1095,18 +1112,29 @@ function getWeatherData() {
                     response.statusCode
                 );
 
-                console.log(
-                    "Weather response:",
-                    body
-                );
-
                 if (response.statusCode !== 200) {
 
-                    reject(
-                        new Error(
-                            `Weather API HTTP ${response.statusCode}`
-                        )
+                    console.log(
+                        "Weather API failed:",
+                        body
                     );
+
+                    // If old cached data exists, keep using it
+                    if (cachedWeather.updatedAt) {
+
+                        resolve({
+                            humidity: cachedWeather.humidity,
+                            windSpeed: cachedWeather.windSpeed
+                        });
+
+                    } else {
+
+                        resolve({
+                            humidity: 0,
+                            windSpeed: 0
+                        });
+
+                    }
 
                     return;
                 }
@@ -1115,50 +1143,41 @@ function getWeatherData() {
 
                     const result = JSON.parse(body);
 
-                    // IMPORTANT:
-                    // Open-Meteo must return current
-                    if (!result.current) {
-
-                        reject(
-                            new Error(
-                                "Weather response missing 'current' object."
-                            )
-                        );
-
-                        return;
-                    }
-
                     const humidity =
-                        result.current.relative_humidity_2m;
+                        result.current?.relative_humidity_2m ?? 0;
 
                     const windSpeed =
-                        result.current.wind_speed_10m;
+                        result.current?.wind_speed_10m ?? 0;
+
+                    // Save weather in memory
+                    cachedWeather = {
+                        humidity: humidity,
+                        windSpeed: windSpeed,
+                        updatedAt: Date.now()
+                    };
 
                     console.log(
-                        "Humidity:",
-                        humidity
-                    );
-
-                    console.log(
-                        "Wind Speed:",
-                        windSpeed
+                        "Fresh weather:",
+                        humidity + "%",
+                        windSpeed + " km/h"
                     );
 
                     resolve({
-
-                        humidity:
-                            humidity ?? 0,
-
-                        windSpeed:
-                            windSpeed ?? 0
-
+                        humidity: humidity,
+                        windSpeed: windSpeed
                     });
 
-                }
+                } catch (error) {
 
-                catch (error) {
+                    console.log(
+                        "Weather JSON error:",
+                        error.message
+                    );
 
-                    reject(error);
+                    resolve({
+                        humidity: cachedWeather.humidity || 0,
+                        windSpeed: cachedWeather.windSpeed || 0
+                    });
 
                 }
 
@@ -1166,7 +1185,15 @@ function getWeatherData() {
 
         }).on("error", (error) => {
 
-            reject(error);
+            console.log(
+                "Weather network error:",
+                error.message
+            );
+
+            resolve({
+                humidity: cachedWeather.humidity || 0,
+                windSpeed: cachedWeather.windSpeed || 0
+            });
 
         });
 
