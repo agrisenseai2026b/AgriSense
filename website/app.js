@@ -1057,7 +1057,12 @@ async function getLatestSensorData() {
 // GET WEATHER DATA FROM OPEN-METEO
 // ============================================================
 
+// ============================================================
+// GET CURRENT WEATHER DATA
+// ============================================================
+
 function getWeatherData() {
+
     return new Promise((resolve, reject) => {
 
         const latitude = 21.1458;
@@ -1070,46 +1075,103 @@ function getWeatherData() {
             `&current=relative_humidity_2m,wind_speed_10m` +
             `&timezone=Asia%2FKolkata`;
 
+        console.log("========================================");
+        console.log("REQUESTING WEATHER DATA");
+        console.log(url);
+        console.log("========================================");
+
         https.get(url, (response) => {
 
             let body = "";
 
             response.on("data", (chunk) => {
-                body += chunk;
+                body += chunk.toString();
             });
 
             response.on("end", () => {
+
+                console.log(
+                    "Weather HTTP status:",
+                    response.statusCode
+                );
+
+                console.log(
+                    "Weather response:",
+                    body
+                );
+
+                if (response.statusCode !== 200) {
+
+                    reject(
+                        new Error(
+                            `Weather API HTTP ${response.statusCode}`
+                        )
+                    );
+
+                    return;
+                }
 
                 try {
 
                     const result = JSON.parse(body);
 
+                    // IMPORTANT:
+                    // Open-Meteo must return current
                     if (!result.current) {
+
                         reject(
-                            new Error("Current weather data unavailable")
+                            new Error(
+                                "Weather response missing 'current' object."
+                            )
                         );
+
                         return;
                     }
 
+                    const humidity =
+                        result.current.relative_humidity_2m;
+
+                    const windSpeed =
+                        result.current.wind_speed_10m;
+
+                    console.log(
+                        "Humidity:",
+                        humidity
+                    );
+
+                    console.log(
+                        "Wind Speed:",
+                        windSpeed
+                    );
+
                     resolve({
+
                         humidity:
-                            result.current.relative_humidity_2m,
+                            humidity ?? 0,
 
                         windSpeed:
-                            result.current.wind_speed_10m
+                            windSpeed ?? 0
+
                     });
 
-                } catch (error) {
+                }
+
+                catch (error) {
+
                     reject(error);
+
                 }
 
             });
 
         }).on("error", (error) => {
+
             reject(error);
+
         });
 
     });
+
 }
 
 
