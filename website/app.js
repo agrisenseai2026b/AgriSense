@@ -695,34 +695,45 @@ const upload = multer({
 // RUN PYTHON
 // ============================================================
 
+// ============================================================
+// RUN PYTHON (Universal & Smart for all models)
+// ============================================================
+
 function runPython(scriptPath, inputData) {
     return new Promise((resolve, reject) => {
-        // Extract the image path safely whether inputData is an object or string
-        let imagePath = "";
-        if (typeof inputData === "string") {
-            imagePath = inputData;
-        } else if (inputData && typeof inputData === "object") {
-            imagePath = 
-                inputData.image_path || 
-                inputData.file_path || 
-                inputData.filePath || 
-                inputData.path || 
-                "";
+        const args = [scriptPath];
+        let stdinData = null;
+
+        // If it's the plant disease model, extract image path as command-line argument
+        if (scriptPath.includes("plant_disease")) {
+            let imagePath = "";
+            if (typeof inputData === "string") {
+                imagePath = inputData;
+            } else if (inputData && typeof inputData === "object") {
+                imagePath = 
+                    inputData.image_path || 
+                    inputData.file_path || 
+                    inputData.filePath || 
+                    inputData.path || 
+                    "";
+            }
+            if (imagePath) {
+                args.push(imagePath);
+            }
+            stdinData = JSON.stringify(inputData);
+        } else {
+            // For crop, fertilizer, and irrigation models, send JSON via stdin
+            stdinData = JSON.stringify(inputData);
         }
 
         console.log("\n----------------------------------------");
-        console.log("Running Python:");
-        console.log(scriptPath);
-        console.log("Image Path Argument:", imagePath);
+        console.log("Running Python:", scriptPath);
+        console.log("Arguments:", args);
         console.log("----------------------------------------");
 
-        // Pass scriptPath and imagePath as command-line arguments (hits sys.argv[1] in Python)
         const python = spawn(
             PYTHON_COMMAND,
-            [
-                scriptPath,
-                imagePath
-            ],
+            args,
             {
                 cwd: path.dirname(scriptPath)
             }
@@ -731,59 +742,36 @@ function runPython(scriptPath, inputData) {
         let output = "";
         let errorOutput = "";
 
-        // =================================================
-        // STDOUT
-        // =================================================
-
         python.stdout.on("data", (data) => {
             output += data.toString();
         });
-
-        // =================================================
-        // STDERR
-        // =================================================
 
         python.stderr.on("data", (data) => {
             errorOutput += data.toString();
         });
 
-        // =================================================
-        // PROCESS ERROR
-        // =================================================
-
         python.on("error", (error) => {
             reject(error);
         });
-
-        // =================================================
-        // PROCESS CLOSED
-        // =================================================
 
         python.on("close", (code) => {
             console.log("Python exit code:", code);
 
             if (errorOutput) {
-                console.log("Python stderr:");
-                console.log(errorOutput);
+                console.log("Python stderr:", errorOutput);
             }
 
-            console.log("Python stdout:");
-            console.log(output);
-
-            // -----------------------------------------
-            // PYTHON FAILED
-            // -----------------------------------------
+            console.log("Python stdout:", output);
 
             if (code !== 0) {
                 try {
                     const pythonResult = JSON.parse(output.trim());
-
                     if (pythonResult.error) {
                         reject(new Error(pythonResult.error));
                         return;
                     }
                 } catch (parseError) {
-                    // Ignore JSON parse error because process failed
+                    // Ignore JSON parse error
                 }
 
                 reject(
@@ -791,22 +779,13 @@ function runPython(scriptPath, inputData) {
                         errorOutput || `Python process exited with code ${code}.`
                     )
                 );
-
                 return;
             }
-
-            // -----------------------------------------
-            // EMPTY OUTPUT
-            // -----------------------------------------
 
             if (!output.trim()) {
                 reject(new Error("Python returned empty output."));
                 return;
             }
-
-            // -----------------------------------------
-            // PARSE JSON
-            // -----------------------------------------
 
             try {
                 const result = JSON.parse(output.trim());
@@ -819,9 +798,14 @@ function runPython(scriptPath, inputData) {
                 );
             }
         });
+
+        // Send stdin data if present
+        if (stdinData) {
+            python.stdin.write(stdinData);
+            python.stdin.end();
+        }
     });
 }
-
 
 // ============================================================
 // GEMINI TEST API
