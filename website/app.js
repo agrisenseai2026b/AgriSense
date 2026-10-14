@@ -9,11 +9,8 @@ const https = require("https");
 const http = require("http");
 const { Server } = require("socket.io");
 
-let cachedWeather = {
-    humidity: 0,
-    windSpeed: 0,
-    updatedAt: 0
-};
+const WEATHER_CACHE_TIME = 24 * 60 * 60 * 1000;
+let cachedWeather = { humidity: 0, windSpeed: 0, updatedAt: null };
 
 const PYTHON_PATH =
     process.env.PYTHON_PATH || "python";
@@ -940,9 +937,6 @@ async function getLatestSensorData() {
 // ============================================================
 // GET WEATHER DATA FROM OPEN-METEO
 // ============================================================
-
-// Set cache time to 24 hours (in milliseconds)
-const WEATHER_CACHE_TIME = 24 * 60 * 60 * 1000; 
 
 function getWeatherData() {
     return new Promise((resolve) => {
