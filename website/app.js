@@ -643,257 +643,135 @@ const upload = multer({
 // RUN PYTHON
 // ============================================================
 
-function runPython(
-    scriptPath,
-    inputData
-) {
-
-    return new Promise(
-        (
-            resolve,
-            reject
-        ) => {
-
-            console.log(
-                "\n----------------------------------------"
-            );
-
-            console.log(
-                "Running Python:"
-            );
-
-            console.log(
-                scriptPath
-            );
-
-            console.log(
-                "Input:"
-            );
-
-            console.log(
-                inputData
-            );
-
-            console.log(
-                "----------------------------------------"
-            );
-
-
-            const python = spawn(
-                PYTHON_COMMAND,
-                [
-                    scriptPath
-                ],
-                {
-                    cwd: path.dirname(scriptPath)
-                }
-            );
-
-
-            let output = "";
-
-            let errorOutput = "";
-
-
-            // =================================================
-            // STDOUT
-            // =================================================
-
-            python.stdout.on(
-                "data",
-                (data) => {
-
-                    output += data.toString();
-
-                }
-            );
-
-
-            // =================================================
-            // STDERR
-            // =================================================
-
-            python.stderr.on(
-                "data",
-                (data) => {
-
-                    errorOutput += data.toString();
-
-                }
-            );
-
-
-            // =================================================
-            // PROCESS ERROR
-            // =================================================
-
-            python.on(
-                "error",
-                (error) => {
-
-                    reject(error);
-
-                }
-            );
-
-
-            // =================================================
-            // PROCESS CLOSED
-            // =================================================
-
-            python.on(
-                "close",
-                (code) => {
-
-                    console.log(
-                        "Python exit code:",
-                        code
-                    );
-
-
-                    if (errorOutput) {
-
-                        console.log(
-                            "Python stderr:"
-                        );
-
-                        console.log(
-                            errorOutput
-                        );
-
-                    }
-
-
-                    console.log(
-                        "Python stdout:"
-                    );
-
-                    console.log(
-                        output
-                    );
-
-
-                    // -----------------------------------------
-                    // PYTHON FAILED
-                    // -----------------------------------------
-
-                    if (code !== 0) {
-
-                        // Try to read JSON error from stdout
-
-                        try {
-
-                            const pythonResult =
-                                JSON.parse(
-                                    output.trim()
-                                );
-
-
-                            if (
-                                pythonResult.error
-                            ) {
-
-                                reject(
-                                    new Error(
-                                        pythonResult.error
-                                    )
-                                );
-
-                                return;
-
-                            }
-
-                        }
-
-                        catch (parseError) {
-
-                            // Ignore JSON parse error
-                            // because process itself failed
-
-                        }
-
-
-                        reject(
-                            new Error(
-                                errorOutput ||
-                                `Python process exited with code ${code}.`
-                            )
-                        );
-
-                        return;
-
-                    }
-
-
-                    // -----------------------------------------
-                    // EMPTY OUTPUT
-                    // -----------------------------------------
-
-                    if (
-                        !output.trim()
-                    ) {
-
-                        reject(
-                            new Error(
-                                "Python returned empty output."
-                            )
-                        );
-
-                        return;
-
-                    }
-
-
-                    // -----------------------------------------
-                    // PARSE JSON
-                    // -----------------------------------------
-
-                    try {
-
-                        const result =
-                            JSON.parse(
-                                output.trim()
-                            );
-
-
-                        resolve(
-                            result
-                        );
-
-                    }
-
-                    catch (error) {
-
-                        reject(
-                            new Error(
-                                "Invalid JSON response from Python: "
-                                +
-                                output
-                            )
-                        );
-
-                    }
-
-                }
-            );
-
-
-            // =================================================
-            // SEND INPUT TO PYTHON
-            // =================================================
-
-            python.stdin.write(
-                JSON.stringify(
-                    inputData
-                )
-            );
-
-
-            python.stdin.end();
-
+// ============================================================
+// RUN PYTHON
+// ============================================================
+
+function runPython(scriptPath, inputData) {
+    return new Promise((resolve, reject) => {
+        // Extract the image path safely whether inputData is an object or string
+        let imagePath = "";
+        if (typeof inputData === "string") {
+            imagePath = inputData;
+        } else if (inputData && typeof inputData === "object") {
+            imagePath = 
+                inputData.image_path || 
+                inputData.file_path || 
+                inputData.filePath || 
+                inputData.path || 
+                "";
         }
-    );
 
+        console.log("\n----------------------------------------");
+        console.log("Running Python:");
+        console.log(scriptPath);
+        console.log("Image Path Argument:", imagePath);
+        console.log("----------------------------------------");
+
+        // Pass scriptPath and imagePath as command-line arguments (hits sys.argv[1] in Python)
+        const python = spawn(
+            PYTHON_COMMAND,
+            [
+                scriptPath,
+                imagePath
+            ],
+            {
+                cwd: path.dirname(scriptPath)
+            }
+        );
+
+        let output = "";
+        let errorOutput = "";
+
+        // =================================================
+        // STDOUT
+        // =================================================
+
+        python.stdout.on("data", (data) => {
+            output += data.toString();
+        });
+
+        // =================================================
+        // STDERR
+        // =================================================
+
+        python.stderr.on("data", (data) => {
+            errorOutput += data.toString();
+        });
+
+        // =================================================
+        // PROCESS ERROR
+        // =================================================
+
+        python.on("error", (error) => {
+            reject(error);
+        });
+
+        // =================================================
+        // PROCESS CLOSED
+        // =================================================
+
+        python.on("close", (code) => {
+            console.log("Python exit code:", code);
+
+            if (errorOutput) {
+                console.log("Python stderr:");
+                console.log(errorOutput);
+            }
+
+            console.log("Python stdout:");
+            console.log(output);
+
+            // -----------------------------------------
+            // PYTHON FAILED
+            // -----------------------------------------
+
+            if (code !== 0) {
+                try {
+                    const pythonResult = JSON.parse(output.trim());
+
+                    if (pythonResult.error) {
+                        reject(new Error(pythonResult.error));
+                        return;
+                    }
+                } catch (parseError) {
+                    // Ignore JSON parse error because process failed
+                }
+
+                reject(
+                    new Error(
+                        errorOutput || `Python process exited with code ${code}.`
+                    )
+                );
+
+                return;
+            }
+
+            // -----------------------------------------
+            // EMPTY OUTPUT
+            // -----------------------------------------
+
+            if (!output.trim()) {
+                reject(new Error("Python returned empty output."));
+                return;
+            }
+
+            // -----------------------------------------
+            // PARSE JSON
+            // -----------------------------------------
+
+            try {
+                const result = JSON.parse(output.trim());
+                resolve(result);
+            } catch (error) {
+                reject(
+                    new Error(
+                        "Invalid JSON response from Python: " + output
+                    )
+                );
+            }
+        });
+    });
 }
 
 
