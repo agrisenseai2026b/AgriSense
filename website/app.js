@@ -9,6 +9,14 @@ const https = require("https");
 const http = require("http");
 const { Server } = require("socket.io");
 
+let cachedWeather = {
+    humidity: 0,
+    windSpeed: 0,
+    updatedAt: 0
+};
+
+const WEATHER_CACHE_TIME = 30 * 60 * 1000; // 30 minutes
+
 const PYTHON_PATH =
     process.env.PYTHON_PATH || "python";
 
@@ -28,7 +36,7 @@ const { askGemini } = require("./ai/gemini");
 // ============================================================
 const app = express();
 
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 // ============================================================
 // HTTP SERVER + SOCKET.IO
@@ -293,7 +301,52 @@ mongoose
         console.log(error);
 
     });
-    
+
+getWeatherData()
+    .then((weather) => {
+
+        currentHumidity =
+            weather.humidity;
+
+        currentWindSpeed =
+            weather.windSpeed;
+
+        console.log(
+            "========================================"
+        );
+
+        console.log(
+            "CURRENT WEATHER"
+        );
+
+        console.log(
+            "Humidity:",
+            currentHumidity + "%"
+        );
+
+        console.log(
+            "Wind Speed:",
+            currentWindSpeed + " km/h"
+        );
+
+        console.log(
+            "========================================"
+        );
+
+    })
+    .catch((error) => {
+
+        console.error(
+            "Initial weather fetch failed:",
+            error.message
+        );
+
+    });
+
+
+
+
+
 
 // ============================================================
 // REAL-TIME FARM INFORMATION CHANGE STREAM
@@ -894,7 +947,22 @@ function getWeatherData() {
 
     return new Promise((resolve, reject) => {
 
-        // Nagpur location
+        // Use cached weather if it is still fresh
+        if (
+            cachedWeather.updatedAt &&
+            Date.now() - cachedWeather.updatedAt < WEATHER_CACHE_TIME
+        ) {
+
+            console.log("Using cached weather data");
+
+            resolve({
+                humidity: cachedWeather.humidity,
+                windSpeed: cachedWeather.windSpeed
+            });
+
+            return;
+        }
+
         const latitude = 21.1458;
         const longitude = 79.0882;
 
@@ -905,33 +973,89 @@ function getWeatherData() {
             `&current=relative_humidity_2m,wind_speed_10m` +
             `&timezone=Asia%2FKolkata`;
 
+        console.log("Requesting fresh weather data...");
+
         https.get(url, (response) => {
 
-            let data = "";
+            let body = "";
 
             response.on("data", (chunk) => {
-                data += chunk;
+                body += chunk.toString();
             });
 
             response.on("end", () => {
 
+                console.log(
+                    "Weather HTTP status:",
+                    response.statusCode
+                );
+
+                if (response.statusCode !== 200) {
+
+                    console.log(
+                        "Weather API failed:",
+                        body
+                    );
+
+                    // If old cached data exists, keep using it
+                    if (cachedWeather.updatedAt) {
+
+                        resolve({
+                            humidity: cachedWeather.humidity,
+                            windSpeed: cachedWeather.windSpeed
+                        });
+
+                    } else {
+
+                        resolve({
+                            humidity: 0,
+                            windSpeed: 0
+                        });
+
+                    }
+
+                    return;
+                }
+
                 try {
 
-                    const result = JSON.parse(data);
+                    const result = JSON.parse(body);
+
+                    const humidity =
+                        result.current?.relative_humidity_2m ?? 0;
+
+                    const windSpeed =
+                        result.current?.wind_speed_10m ?? 0;
+
+                    // Save weather in memory
+                    cachedWeather = {
+                        humidity: humidity,
+                        windSpeed: windSpeed,
+                        updatedAt: Date.now()
+                    };
+
+                    console.log(
+                        "Fresh weather:",
+                        humidity + "%",
+                        windSpeed + " km/h"
+                    );
 
                     resolve({
-
-                        humidity:
-                            result.current?.relative_humidity_2m ?? null,
-
-                        windSpeed:
-                            result.current?.wind_speed_10m ?? null
-
+                        humidity: humidity,
+                        windSpeed: windSpeed
                     });
 
                 } catch (error) {
 
-                    reject(error);
+                    console.log(
+                        "Weather JSON error:",
+                        error.message
+                    );
+
+                    resolve({
+                        humidity: cachedWeather.humidity || 0,
+                        windSpeed: cachedWeather.windSpeed || 0
+                    });
 
                 }
 
@@ -939,13 +1063,145 @@ function getWeatherData() {
 
         }).on("error", (error) => {
 
-            reject(error);
+            console.log(
+                "Weather network error:",
+                error.message
+            );
+
+            resolve({
+                humidity: cachedWeather.humidity || 0,
+                windSpeed: cachedWeather.windSpeed || 0
+            });
 
         });
 
     });
 
 }
+function getWeatherData() {
+    return new Promise((resolve, reject) => {
+
+        // Use cache only if it contains valid weather data
+        if (
+            cachedWeather.updatedAt &&
+            Date.now() - cachedWeather.updatedAt < WEATHER_CACHE_TIME
+        ) {
+            console.log("Using cached weather:", cachedWeather);
+
+            return resolve({
+                humidity: cachedWeather.humidity,
+                windSpeed: cachedWeather.windSpeed
+            });
+        }
+
+        const latitude = 21.1458;
+        const longitude = 79.0882;
+
+        const url =
+            "https://api.open-meteo.com/v1/forecast" +
+            `?latitude=${latitude}` +
+            `&longitude=${longitude}` +
+            "&current=relative_humidity_2m,wind_speed_10m" +
+            "&timezone=Asia%2FKolkata";
+
+        console.log("Requesting Open-Meteo weather data...");
+
+        const request = https.get(url, (response) => {
+            let body = "";
+
+            response.on("data", chunk => {
+                body += chunk.toString();
+            });
+
+            response.on("end", () => {
+                try {
+                    console.log("Weather HTTP status:", response.statusCode);
+
+                    if (response.statusCode !== 200) {
+                        throw new Error(
+                            `Open-Meteo returned HTTP ${response.statusCode}: ${body}`
+                        );
+                    }
+
+                    const result = JSON.parse(body);
+
+                    console.log("Open-Meteo response:", result);
+
+                    if (result.error) {
+                        throw new Error(
+                            result.reason || "Weather API returned an error"
+                        );
+                    }
+
+                    const current = result.current;
+
+                    if (
+                        !current ||
+                        current.relative_humidity_2m == null ||
+                        current.wind_speed_10m == null
+                    ) {
+                        throw new Error(
+                            "Weather response is missing humidity or wind speed"
+                        );
+                    }
+
+                    const weather = {
+                        humidity: Number(current.relative_humidity_2m),
+                        windSpeed: Number(current.wind_speed_10m),
+                        updatedAt: Date.now()
+                    };
+
+                    if (
+                        !Number.isFinite(weather.humidity) ||
+                        !Number.isFinite(weather.windSpeed)
+                    ) {
+                        throw new Error("Invalid numeric weather values");
+                    }
+
+                    cachedWeather = weather;
+
+                    console.log("Weather fetched successfully:", weather);
+
+                    resolve({
+                        humidity: weather.humidity,
+                        windSpeed: weather.windSpeed
+                    });
+
+                } catch (error) {
+                    console.error("Weather response error:", error.message);
+
+                    // Use previous cache only if it contains valid data
+                    if (cachedWeather.updatedAt) {
+                        resolve({
+                            humidity: cachedWeather.humidity,
+                            windSpeed: cachedWeather.windSpeed
+                        });
+                    } else {
+                        reject(error);
+                    }
+                }
+            });
+        });
+
+        request.setTimeout(10000, () => {
+            request.destroy(new Error("Weather API request timed out"));
+        });
+
+        request.on("error", error => {
+            console.error("Weather network error:", error.message);
+
+            if (cachedWeather.updatedAt) {
+                resolve({
+                    humidity: cachedWeather.humidity,
+                    windSpeed: cachedWeather.windSpeed
+                });
+            } else {
+                reject(error);
+            }
+        });
+    });
+}
+
 
 
 
@@ -990,6 +1246,8 @@ app.get("/", async (req, res) => {
 
         let humidity = null;
         let windSpeed = null;
+        let currentHumidity = 0;
+        let currentWindSpeed = 0;
 
         try {
 
@@ -4286,154 +4544,87 @@ app.post("/api/irrigation-predict", async (req, res) => {
 // ANDROID DASHBOARD API
 // ============================================================
 
-app.get(
-    "/api/dashboard",
-    async (req, res) => {
+app.get("/api/dashboard", async (req, res) => {
+    try {
+        // 1. Get the latest sensor data from MongoDB
+        const data = await SensorData
+            .findOne()
+            .sort({ _id: -1 });
+
+        // 2. Get farm information
+        const farmInfo = await getFarmInfo();
+
+        // 3. Fetch weather data
+        let weather = {
+            humidity: null,
+            windSpeed: null
+        };
 
         try {
+            const weatherData = await getWeatherData();
 
-            const data = await SensorData
-                .findOne()
-                .sort({ _id: -1 });
-
-            const farmInfo =
-                await getFarmInfo();
-
-            let weather = {
-                humidity: null,
-                windSpeed: null
-            };
-
-            try {
-
-                weather =
-                    await getWeatherData();
-
-            } catch (weatherError) {
-
-                console.log(
-                    "Weather API error:",
-                    weatherError.message
-                );
-
-            }
-
-            res.json({
-
-                success: true,
-
-                sensor: {
-
-                    moisture:
-                        data
-                            ? data.moisture
-                            : null,
-
-                    temperature:
-                        data
-                            ? data.temperature
-                            : null,
-
-                    pH:
-                        data
-                            ? data.pH
-                            : null,
-
-                    nitrogen:
-                        data
-                            ? data.nitrogen
-                            : null,
-
-                    phosphorus:
-                        data
-                            ? data.phosphorus
-                            : null,
-
-                    potassium:
-                        data
-                            ? data.potassium
-                            : null
-
-                },
-
-                weather: {
-
+            if (weatherData) {
+                weather = {
                     humidity:
-                        weather.humidity,
+                        weatherData.humidity ?? null,
 
                     windSpeed:
-                        weather.windSpeed
+                        weatherData.windSpeed ?? null
+                };
+            }
 
-                },
+            console.log("Weather data received:", weather);
 
-                farm: {
-
-                    rainfall:
-                        farmInfo
-                            ? farmInfo.rainfall
-                            : 0,
-
-                    cropType:
-                        farmInfo
-                            ? farmInfo.cropType
-                            : "Wheat",
-
-                    soilType:
-                        farmInfo
-                            ? farmInfo.soilType
-                            : "Loamy",
-
-                    season:
-                        farmInfo
-                            ? farmInfo.season
-                            : "Monsoon",
-
-                    irrigationType:
-                        farmInfo
-                            ? farmInfo.irrigationType
-                            : "Drip",
-
-                    waterSource:
-                        farmInfo
-                            ? farmInfo.waterSource
-                            : "Groundwater",
-
-                    fieldArea:
-                        farmInfo
-                            ? farmInfo.fieldArea
-                            : 1,
-
-                    region:
-                        farmInfo
-                            ? farmInfo.region
-                            : "Central"
-
-                }
-
-            });
-
-        }
-
-        catch (error) {
-
+        } catch (weatherError) {
             console.error(
-                "Android dashboard API error:",
-                error
+                "Weather API error:",
+                weatherError.message
             );
-
-            res.status(500).json({
-
-                success: false,
-
-                error:
-                    error.message
-
-            });
-
         }
 
+        // 4. Send dashboard response
+        return res.status(200).json({
+            success: true,
+
+            sensor: {
+                moisture: data?.moisture ?? null,
+                temperature: data?.temperature ?? null,
+                pH: data?.pH ?? null,
+                nitrogen: data?.nitrogen ?? null,
+                phosphorus: data?.phosphorus ?? null,
+                potassium: data?.potassium ?? null
+            },
+
+            weather: {
+                humidity: weather.humidity,
+                windSpeed: weather.windSpeed
+            },
+
+            farm: {
+                rainfall: farmInfo?.rainfall ?? 0,
+                cropType: farmInfo?.cropType ?? "Wheat",
+                soilType: farmInfo?.soilType ?? "Loamy",
+                season: farmInfo?.season ?? "Monsoon",
+                irrigationType: farmInfo?.irrigationType ?? "Drip",
+                waterSource: farmInfo?.waterSource ?? "Groundwater",
+                fieldArea: farmInfo?.fieldArea ?? 1,
+                region: farmInfo?.region ?? "Central"
+            }
+        });
+
+    } catch (error) {
+        console.error(
+            "Android dashboard API error:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
-);
+});
+
 
 // ============================================================
 // ANDROID - UPDATE FARM INFORMATION
@@ -4702,5 +4893,3 @@ server.listen(
 
     }
 );
-
-
