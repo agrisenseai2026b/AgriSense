@@ -1,8 +1,9 @@
-joblib
-numpy
-pandas
-scikit-learn
-tensorflow
-pillow
+--extra-index-url https://download.pytorch.org/whl/cpu
 torch
 torchvision
+tensorflow-cpu
+scikit-learn
+pandas
+numpy
+pillow
+joblib
