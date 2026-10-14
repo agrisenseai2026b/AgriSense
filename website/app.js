@@ -943,151 +943,18 @@ async function getLatestSensorData() {
 // GET WEATHER DATA FROM OPEN-METEO
 // ============================================================
 
+// Set cache time to 24 hours (in milliseconds)
+const WEATHER_CACHE_TIME = 24 * 60 * 60 * 1000; 
+
 function getWeatherData() {
+    return new Promise((resolve) => {
 
-    return new Promise((resolve, reject) => {
-
-        // Use cached weather if it is still fresh
+        // Check if cached data exists and is less than 24 hours old
         if (
             cachedWeather.updatedAt &&
             Date.now() - cachedWeather.updatedAt < WEATHER_CACHE_TIME
         ) {
-
-            console.log("Using cached weather data");
-
-            resolve({
-                humidity: cachedWeather.humidity,
-                windSpeed: cachedWeather.windSpeed
-            });
-
-            return;
-        }
-
-        const latitude = 21.1458;
-        const longitude = 79.0882;
-
-        const url =
-            `https://api.open-meteo.com/v1/forecast` +
-            `?latitude=${latitude}` +
-            `&longitude=${longitude}` +
-            `&current=relative_humidity_2m,wind_speed_10m` +
-            `&timezone=Asia%2FKolkata`;
-
-        console.log("Requesting fresh weather data...");
-
-        https.get(url, (response) => {
-
-            let body = "";
-
-            response.on("data", (chunk) => {
-                body += chunk.toString();
-            });
-
-            response.on("end", () => {
-
-                console.log(
-                    "Weather HTTP status:",
-                    response.statusCode
-                );
-
-                if (response.statusCode !== 200) {
-
-                    console.log(
-                        "Weather API failed:",
-                        body
-                    );
-
-                    // If old cached data exists, keep using it
-                    if (cachedWeather.updatedAt) {
-
-                        resolve({
-                            humidity: cachedWeather.humidity,
-                            windSpeed: cachedWeather.windSpeed
-                        });
-
-                    } else {
-
-                        resolve({
-                            humidity: 0,
-                            windSpeed: 0
-                        });
-
-                    }
-
-                    return;
-                }
-
-                try {
-
-                    const result = JSON.parse(body);
-
-                    const humidity =
-                        result.current?.relative_humidity_2m ?? 0;
-
-                    const windSpeed =
-                        result.current?.wind_speed_10m ?? 0;
-
-                    // Save weather in memory
-                    cachedWeather = {
-                        humidity: humidity,
-                        windSpeed: windSpeed,
-                        updatedAt: Date.now()
-                    };
-
-                    console.log(
-                        "Fresh weather:",
-                        humidity + "%",
-                        windSpeed + " km/h"
-                    );
-
-                    resolve({
-                        humidity: humidity,
-                        windSpeed: windSpeed
-                    });
-
-                } catch (error) {
-
-                    console.log(
-                        "Weather JSON error:",
-                        error.message
-                    );
-
-                    resolve({
-                        humidity: cachedWeather.humidity || 0,
-                        windSpeed: cachedWeather.windSpeed || 0
-                    });
-
-                }
-
-            });
-
-        }).on("error", (error) => {
-
-            console.log(
-                "Weather network error:",
-                error.message
-            );
-
-            resolve({
-                humidity: cachedWeather.humidity || 0,
-                windSpeed: cachedWeather.windSpeed || 0
-            });
-
-        });
-
-    });
-
-}
-function getWeatherData() {
-    return new Promise((resolve, reject) => {
-
-        // Use cache only if it contains valid weather data
-        if (
-            cachedWeather.updatedAt &&
-            Date.now() - cachedWeather.updatedAt < WEATHER_CACHE_TIME
-        ) {
-            console.log("Using cached weather:", cachedWeather);
-
+            console.log("Using cached weather (fresh within 24 hours):", cachedWeather);
             return resolve({
                 humidity: cachedWeather.humidity,
                 windSpeed: cachedWeather.windSpeed
@@ -1104,7 +971,7 @@ function getWeatherData() {
             "&current=relative_humidity_2m,wind_speed_10m" +
             "&timezone=Asia%2FKolkata";
 
-        console.log("Requesting Open-Meteo weather data...");
+        console.log("Fetching fresh Open-Meteo weather data (24h limit expired or fresh boot)...");
 
         const request = https.get(url, (response) => {
             let body = "";
@@ -1115,52 +982,26 @@ function getWeatherData() {
 
             response.on("end", () => {
                 try {
-                    console.log("Weather HTTP status:", response.statusCode);
-
                     if (response.statusCode !== 200) {
-                        throw new Error(
-                            `Open-Meteo returned HTTP ${response.statusCode}: ${body}`
-                        );
+                        console.warn(`Weather API warning: HTTP ${response.statusCode}. Using fallback.`);
+                        return resolve(getFallbackWeather());
                     }
 
                     const result = JSON.parse(body);
 
-                    console.log("Open-Meteo response:", result);
-
-                    if (result.error) {
-                        throw new Error(
-                            result.reason || "Weather API returned an error"
-                        );
-                    }
-
-                    const current = result.current;
-
-                    if (
-                        !current ||
-                        current.relative_humidity_2m == null ||
-                        current.wind_speed_10m == null
-                    ) {
-                        throw new Error(
-                            "Weather response is missing humidity or wind speed"
-                        );
+                    if (result.error || !result.current) {
+                        console.warn("Weather API returned an error structure. Using fallback.");
+                        return resolve(getFallbackWeather());
                     }
 
                     const weather = {
-                        humidity: Number(current.relative_humidity_2m),
-                        windSpeed: Number(current.wind_speed_10m),
+                        humidity: Number(result.current.relative_humidity_2m ?? 60),
+                        windSpeed: Number(result.current.wind_speed_10m ?? 10),
                         updatedAt: Date.now()
                     };
 
-                    if (
-                        !Number.isFinite(weather.humidity) ||
-                        !Number.isFinite(weather.windSpeed)
-                    ) {
-                        throw new Error("Invalid numeric weather values");
-                    }
-
                     cachedWeather = weather;
-
-                    console.log("Weather fetched successfully:", weather);
+                    console.log("Weather successfully updated:", weather);
 
                     resolve({
                         humidity: weather.humidity,
@@ -1168,40 +1009,40 @@ function getWeatherData() {
                     });
 
                 } catch (error) {
-                    console.error("Weather response error:", error.message);
-
-                    // Use previous cache only if it contains valid data
-                    if (cachedWeather.updatedAt) {
-                        resolve({
-                            humidity: cachedWeather.humidity,
-                            windSpeed: cachedWeather.windSpeed
-                        });
-                    } else {
-                        reject(error);
-                    }
+                    console.error("Weather JSON parse error:", error.message);
+                    resolve(getFallbackWeather());
                 }
             });
         });
 
-        request.setTimeout(10000, () => {
-            request.destroy(new Error("Weather API request timed out"));
+        request.setTimeout(8000, () => {
+            request.destroy();
+            console.warn("Weather API request timed out. Using fallback.");
+            resolve(getFallbackWeather());
         });
 
-        request.on("error", error => {
+        request.on("error", (error) => {
             console.error("Weather network error:", error.message);
-
-            if (cachedWeather.updatedAt) {
-                resolve({
-                    humidity: cachedWeather.humidity,
-                    windSpeed: cachedWeather.windSpeed
-                });
-            } else {
-                reject(error);
-            }
+            resolve(getFallbackWeather());
         });
     });
 }
 
+// Safe fallback helper so your app never crashes
+function getFallbackWeather() {
+    if (cachedWeather.updatedAt) {
+        console.log("Using expired cache as fallback.");
+        return {
+            humidity: cachedWeather.humidity,
+            windSpeed: cachedWeather.windSpeed
+        };
+    }
+    // Absolute default values if cache is totally empty
+    return {
+        humidity: 60,
+        windSpeed: 10
+    };
+}
 
 
 
