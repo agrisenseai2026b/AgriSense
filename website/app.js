@@ -15,8 +15,6 @@ let cachedWeather = {
     updatedAt: 0
 };
 
-const WEATHER_CACHE_TIME = 30 * 60 * 1000; // 30 minutes
-
 const PYTHON_PATH =
     process.env.PYTHON_PATH || "python";
 
@@ -948,13 +946,12 @@ const WEATHER_CACHE_TIME = 24 * 60 * 60 * 1000;
 
 function getWeatherData() {
     return new Promise((resolve) => {
-
-        // Check if cached data exists and is less than 24 hours old
+        // Use cache only if it contains valid weather data updated within 24 hours
         if (
             cachedWeather.updatedAt &&
             Date.now() - cachedWeather.updatedAt < WEATHER_CACHE_TIME
         ) {
-            console.log("Using cached weather (fresh within 24 hours):", cachedWeather);
+            console.log("Using cached weather data (fresh within 24 hours):", cachedWeather);
             return resolve({
                 humidity: cachedWeather.humidity,
                 windSpeed: cachedWeather.windSpeed
@@ -971,7 +968,7 @@ function getWeatherData() {
             "&current=relative_humidity_2m,wind_speed_10m" +
             "&timezone=Asia%2FKolkata";
 
-        console.log("Fetching fresh Open-Meteo weather data (24h limit expired or fresh boot)...");
+        console.log("Requesting fresh Open-Meteo weather data...");
 
         const request = https.get(url, (response) => {
             let body = "";
@@ -982,6 +979,8 @@ function getWeatherData() {
 
             response.on("end", () => {
                 try {
+                    console.log("Weather HTTP status:", response.statusCode);
+
                     if (response.statusCode !== 200) {
                         console.warn(`Weather API warning: HTTP ${response.statusCode}. Using fallback.`);
                         return resolve(getFallbackWeather());
@@ -994,50 +993,55 @@ function getWeatherData() {
                         return resolve(getFallbackWeather());
                     }
 
-                    const weather = {
-                        humidity: Number(result.current.relative_humidity_2m ?? 60),
-                        windSpeed: Number(result.current.wind_speed_10m ?? 10),
+                    const current = result.current;
+                    const humidity = Number(current.relative_humidity_2m ?? 60);
+                    const windSpeed = Number(current.wind_speed_10m ?? 10);
+
+                    if (!Number.isFinite(humidity) || !Number.isFinite(windSpeed)) {
+                        throw new Error("Invalid numeric weather values");
+                    }
+
+                    cachedWeather = {
+                        humidity: humidity,
+                        windSpeed: windSpeed,
                         updatedAt: Date.now()
                     };
 
-                    cachedWeather = weather;
-                    console.log("Weather successfully updated:", weather);
+                    console.log("Weather fetched and cached successfully:", cachedWeather);
 
                     resolve({
-                        humidity: weather.humidity,
-                        windSpeed: weather.windSpeed
+                        humidity: cachedWeather.humidity,
+                        windSpeed: cachedWeather.windSpeed
                     });
 
                 } catch (error) {
-                    console.error("Weather JSON parse error:", error.message);
+                    console.error("Weather response/parsing error:", error.message);
                     resolve(getFallbackWeather());
                 }
             });
         });
 
-        request.setTimeout(8000, () => {
-            request.destroy();
-            console.warn("Weather API request timed out. Using fallback.");
-            resolve(getFallbackWeather());
+        request.setTimeout(10000, () => {
+            request.destroy(new Error("Weather API request timed out"));
         });
 
-        request.on("error", (error) => {
+        request.on("error", error => {
             console.error("Weather network error:", error.message);
             resolve(getFallbackWeather());
         });
     });
 }
 
-// Safe fallback helper so your app never crashes
+// Safe fallback helper so your app never crashes when rate-limited or offline
 function getFallbackWeather() {
     if (cachedWeather.updatedAt) {
-        console.log("Using expired cache as fallback.");
+        console.log("Using expired cache as fallback due to API error/limit.");
         return {
             humidity: cachedWeather.humidity,
             windSpeed: cachedWeather.windSpeed
         };
     }
-    // Absolute default values if cache is totally empty
+    // Absolute default safe values if cache is totally empty
     return {
         humidity: 60,
         windSpeed: 10
