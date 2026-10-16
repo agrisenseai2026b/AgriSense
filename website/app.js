@@ -920,6 +920,24 @@ async function getLatestSensorData() {
 // ============================================================
 // GET WEATHER DATA FROM OPEN-METEO
 // ============================================================
+// ============================================================
+// MONGODB WEATHER CACHE MODEL
+// ============================================================
+
+const weatherCacheSchema = new mongoose.Schema({
+    humidity: Number,
+    windSpeed: Number,
+    updatedAt: {
+        type: Date,
+        default: Date.now
+    }
+});
+
+const WeatherCache = mongoose.model(
+    "WeatherCache",
+    weatherCacheSchema,
+    "weathercaches"
+);
 
 const WEATHER_CACHE_TIME = 3 * 60 * 60 * 1000; // 3 hours in milliseconds
 
