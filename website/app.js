@@ -9,7 +9,6 @@ const https = require("https");
 const http = require("http");
 const { Server } = require("socket.io");
 
-const WEATHER_CACHE_TIME = 24 * 60 * 60 * 1000;
 let cachedWeather = { humidity: 0, windSpeed: 0, updatedAt: null };
 
 const PYTHON_PATH =
