@@ -183,6 +183,15 @@ console.log("MongoDB URI loaded:",
     process.env.MONGODB_URI ? "YES" : "NO"
 );
 
+
+// ============================================================
+// MONGODB CONNECTION
+// ============================================================
+
+console.log("MongoDB URI loaded:",
+    process.env.MONGODB_URI ? "YES" : "NO"
+);
+
 mongoose
     .connect(process.env.MONGODB_URI)
     .then(async () => {
@@ -190,6 +199,24 @@ mongoose
         console.log("MongoDB Connected Successfully");
         console.log("Database: AgriSenseDB");
         console.log("Collection: sensordatas");
+
+        // ========================================================
+        // FETCH INITIAL WEATHER DATA (AFTER DB IS CONNECTED)
+        // ========================================================
+        try {
+            const weather = await getWeatherData();
+            
+            currentHumidity = weather.humidity;
+            currentWindSpeed = weather.windSpeed;
+
+            console.log("========================================");
+            console.log("CURRENT WEATHER");
+            console.log("Humidity:", currentHumidity + "%");
+            console.log("Wind Speed:", currentWindSpeed + " km/h");
+            console.log("========================================");
+        } catch (error) {
+            console.error("Initial weather fetch failed:", error.message);
+        }
 
         // ========================================================
         // START SENSOR REAL-TIME CHANGE STREAM
@@ -314,49 +341,6 @@ mongoose
         console.log(error);
 
     });
-
-getWeatherData()
-    .then((weather) => {
-
-        currentHumidity =
-            weather.humidity;
-
-        currentWindSpeed =
-            weather.windSpeed;
-
-        console.log(
-            "========================================"
-        );
-
-        console.log(
-            "CURRENT WEATHER"
-        );
-
-        console.log(
-            "Humidity:",
-            currentHumidity + "%"
-        );
-
-        console.log(
-            "Wind Speed:",
-            currentWindSpeed + " km/h"
-        );
-
-        console.log(
-            "========================================"
-        );
-
-    })
-    .catch((error) => {
-
-        console.error(
-            "Initial weather fetch failed:",
-            error.message
-        );
-
-    });
-
-
 
 
 
